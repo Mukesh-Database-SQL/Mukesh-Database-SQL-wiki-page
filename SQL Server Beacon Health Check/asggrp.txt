@@ -1,0 +1,10 @@
+assignee_groups like '%1000000538%'    --Data Engineering
+
+assignee_groups like '%1000000211%'     -- DataBase
+
+ assignee_groups like '%1000000216%'     -- Infrastructure Software Services
+
+assignee_groups like '%1000000160%'     -- 365
+
+assignee_groups like '%1000000397%'     -- Identity
+

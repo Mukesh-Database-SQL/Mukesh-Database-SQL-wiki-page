@@ -1,0 +1,7 @@
+infosteward-dev:443/BOE/CMC,Beacon_Infostewdev
+infosteward-dev:443/BOE/BI,Beacon_Infostewdevbi
+infosteward-uat:443/BOE/CMC,Beacon_Infostewuat
+infosteward:443/BOE/CMC,Beacon_Infostewprd
+rimscld-uat.bcc.qld.gov.au:443/reports/rwservlet?clndrunrep&c03rdupa&P_START_DATE=05/12/2023&P_END_DATE=05/12/2023,Beacon_rimscldev
+https://mimreporting.bcc.qld.gov.au/Reports/browse/,Beacon_Identity
+https://mimreporting-uat.bcc.qld.gov.au/Reports/browse/,Beacon_Uat_Identity
