@@ -1,0 +1,778 @@
+Snippet#1 - Determine the Last Time Statistics Were Generated.
+
+This script can be run in SQL 2000, 2005 and 2008.
+
+
+
+SELECT t.name AS Table_Name,
+       i.name AS Index_Name,
+       i.type_desc AS Index_Type,
+       STATS_DATE(i.object_id,i.index_id) AS Date_Updated
+FROM sys.indexes i JOIN	 sys.tables t ON t.object_id = i.object_id
+WHERE         	 i.type > 0 
+ORDER BY	 t.name ASC,
+             i.type_desc ASC,
+             i.name ASC 
+Snippet#2 - Get Encrypted Password for SQL Server Logins. - Clone Logins
+
+This script can be run in SQL 2000, 2005 and 2008.
+
+
+
+d:\Richard> isql -Sc2k158 -Usa
+Password:
+1> select CONVERT(VARBINARY(64), password) from syslogins where name = 'zam'
+2> go
+ ------------------------------------------------------------------
+ 0x01002f64730f27603dbda002894ed8fdb2960ff818b87d19426de6e2e8f1fe61
+(1 row affected)
+1> exit
+d:\Richard> isql -Scorpsqlcl1 -Usa
+Password:
+1> EXEC sp_addlogin 'zam', 0x01002f64730f27603dbda002894ed8fdb2960ff818b87d19426de6e2e8f1fe61, @encryptopt = 'skip_encryption'
+2> go
+New login created.
+1> select CONVERT(VARBINARY(64), password) from syslogins where name = 'zam'
+2> go
+ ------------------------------------------------------------------
+ 0x01002f64730f27603dbda002894ed8fdb2960ff818b87d19426de6e2e8f1fe61
+(1 row affected)
+1>
+Snippet#3 - MSSQL Central Queries. Statistics etc.
+
+These scripts should be run against the DBA_Maintenance Database in MSSQL_CENTRAL SQL Server
+
+ 
+
+
+
+-- List the number of active Customer databases being monitored within SQL Server Central.
+select count(1) from bcc.MSSQL_Database where decommission_date is null
+and Database_Name not in ('tempdb','model', 'msdb', 'master')
+-- List breakdown of environments for active customer databases monitored within SQL Server Central.
+select Environment,sum(1)  from bcc.MSSQL_Database a, bcc.MSSQL_Server b 
+where a.Server_ID = b.Server_ID
+and a.decommission_date is null
+and a.Database_Name not in ('tempdb','model', 'msdb', 'master')
+group by b.Environment
+-- List breakdown of environments, Product Version and Product Level for active customer databases monitored within SQL Server Central.
+-- List breakdown of environments, Product Version and Product Level for active customer databases monitored within SQL Server Central.
+select Environment,b.product_level, b.product_version, sum(1)  from bcc.MSSQL_Database a, bcc.MSSQL_Server b 
+where a.Server_ID = b.Server_ID
+and a.decommission_date is null
+and a.Database_Name not in ('tempdb','model', 'msdb', 'master')
+group by b.Environment, b.product_level, product_version
+-- List all SQL Server Databases, Applications, Database Sizing, Versions and Environment List 
+-- Useful for Capacity Planning, Patching Planning and Inventory Listing etc.
+select a.Database_Name 'Database Name', 
+b.server_name 'Host Name',
+b.product_version 'Version',
+a.application_name 'Application Name',
+(select sum(MB_Storage_Allocated) 
+ from bcc.MSSQL_Database_Files c
+ where c.date_checked = a.last_modified_date
+ and c.database_id= a.database_id) 'Database Storage (MB)', 
+'N/A' 'Concurrent Users',
+Environment 'Environment', 
+b.version_description 'Comments'
+from bcc.MSSQL_Database a, bcc.MSSQL_Server b 
+where a.Server_ID = b.Server_ID
+and a.decommission_date is null
+and a.Database_Name not in ('tempdb','model', 'msdb', 'master','DBA_Maintenance')
+Snippet#4 - Database Storage and Physical File Allocations.
+
+This script should be used to determine the storage used for the current database. These results returned are in pages. Multiply by 8192 to determine number of bytes of storage.
+
+
+
+DECLARE @dbsize bigint 
+DECLARE @logsize bigint 
+DECLARE @ftsize bigint 
+DECLARE @reservedpages bigint 
+DECLARE @pages bigint 
+DECLARE @usedpages bigint
+SELECT @dbsize = SUM(convert(bigint,case when type = 0 then size else 0 end)) 
+      ,@logsize = SUM(convert(bigint,case when type = 1 then size else 0 end)) 
+      ,@ftsize = SUM(convert(bigint,case when type = 4 then size else 0 end)) 
+FROM sys.database_files
+SELECT @reservedpages = SUM(a.total_pages) 
+       ,@usedpages = SUM(a.used_pages) 
+       ,@pages = SUM(CASE 
+                        WHEN it.internal_type IN (202,204) THEN 0 
+                        WHEN a.type != 1 THEN a.used_pages 
+                        WHEN p.index_id < 2 THEN a.data_pages 
+                        ELSE 0 
+                     END) 
+FROM sys.partitions p  
+JOIN sys.allocation_units a ON p.partition_id = a.container_id 
+LEFT JOIN sys.internal_tables it ON p.object_id = it.object_id 
+SELECT 
+        @dbsize as 'dbsize',
+        @logsize as 'logsize',
+        @ftsize as 'ftsize',
+        @reservedpages as 'reservedpages',
+        @usedpages as 'usedpages',
+        @pages as 'pages'
+Snippet#5 - Performance Wait Events.
+
+These scripts should be used when investigating wait events in-situ. A better more intuitive output can be obtained from DBA_Warehouse for historical statistics or from SQL Server Profiler or Profiler.
+
+ 
+
+
+
+os_wait_stats
+SET NOCOUNT ON
+SELECT 
+    LEFT (wait_type, 45) AS wait_type, 
+    SUM (waiting_tasks_count) AS waiting_tasks_count, 
+    SUM (wait_time_ms) AS wait_time_ms, 
+    SUM (signal_wait_time_ms) AS signal_wait_time_ms
+FROM 
+(
+    SELECT 
+        LEFT (wait_type, 45) AS wait_type, 
+    waiting_tasks_count, 
+    wait_time_ms,  
+    signal_wait_time_ms
+FROM sys.dm_os_wait_stats 
+WHERE waiting_tasks_count > 0 OR wait_time_ms > 0 OR signal_wait_time_ms > 0
+    UNION ALL 
+    SELECT 
+        LEFT (wait_type, 45) AS wait_type, 
+        1 AS waiting_tasks_count, 
+        wait_duration_ms AS wait_time_ms, 
+        0 AS signal_wait_time_ms
+    FROM sys.dm_os_waiting_tasks
+    WHERE wait_duration_ms > 60000
+) AS merged_wait_stats
+GROUP BY wait_type
+--------------------------------------------------------------------------------
+os_latch_stats
+SET NOCOUNT ON
+SELECT 
+  LEFT(latch_class,45) as latch_class,
+  waiting_requests_count,
+  wait_time_ms
+FROM sys.dm_os_latch_stats 
+WHERE waiting_requests_count > 0 OR wait_time_ms > 0
+--------------------------------------------------------------------------------
+sql_process_and_system_memory
+SET NOCOUNT ON
+SELECT 
+    pm.physical_memory_in_use_kb            AS sql_physical_memory_in_use_kb, 
+    pm.large_page_allocations_kb            AS sql_large_page_allocations_kb, 
+    pm.locked_page_allocations_kb           AS sql_locked_page_allocations_kb, 
+    pm.total_virtual_address_space_kb       AS sql_total_virtual_address_space_kb, 
+    pm.virtual_address_space_reserved_kb    AS sql_virtual_address_space_reserved_kb, 
+    pm.virtual_address_space_committed_kb   AS sql_virtual_address_space_committed_kb, 
+    pm.virtual_address_space_available_kb   AS sql_virtual_address_space_available_kb, 
+    pm.page_fault_count                     AS sql_page_fault_count, 
+    pm.memory_utilization_percentage        AS sql_memory_utilization_percentage, 
+    pm.available_commit_limit_kb            AS sql_available_commit_limit_kb, 
+    pm.process_physical_memory_low          AS sql_process_physical_memory_low, 
+    pm.process_virtual_memory_low           AS sql_process_virtual_memory_low, 
+    sm.total_physical_memory_kb             AS system_total_physical_memory_kb, 
+    sm.available_physical_memory_kb         AS system_available_physical_memory_kb, 
+    sm.total_page_file_kb                   AS system_total_page_file_kb, 
+    sm.available_page_file_kb               AS system_available_page_file_kb, 
+    sm.system_cache_kb                      AS system_cache_kb, 
+    sm.kernel_paged_pool_kb                 AS system_kernel_paged_pool_kb, 
+    sm.kernel_nonpaged_pool_kb              AS system_kernel_nonpaged_pool_kb, 
+    sm.system_high_memory_signal_state      AS system_high_memory_signal_state, 
+    sm.system_low_memory_signal_state       AS system_low_memory_signal_state, 
+    si.bpool_commit_target                  AS bpool_commit_target, 
+    si.bpool_committed                      AS bpool_committed, 
+    si.bpool_visible                        AS bpool_visible
+FROM sys.dm_os_process_memory AS pm
+CROSS JOIN sys.dm_os_sys_memory AS sm   -- single-row DMV
+CROSS JOIN sys.dm_os_sys_info AS si;    -- single-row DMV
+--------------------------------------------------------------------------------
+os_memory_nodes
+SET NOCOUNT ON
+SELECT 
+    memory_node_id, 
+    virtual_address_space_reserved_kb, 
+    virtual_address_space_committed_kb, 
+    locked_page_allocations_kb, 
+    single_pages_kb, 
+    multi_pages_kb, 
+    shared_memory_reserved_kb, 
+    shared_memory_committed_kb
+FROM sys.dm_os_memory_nodes
+--------------------------------------------------------------------------------
+os_memory_clerks
+SET NOCOUNT ON
+SELECT 
+    type,
+    memory_node_id as memory_node_id,
+    SUM(single_pages_kb) as single_pages_kb,
+    SUM(multi_pages_kb) as multi_pages_kb,
+    SUM(virtual_memory_reserved_kb) as virtual_memory_reserved_kb,
+    SUM(virtual_memory_committed_kb) as virtual_memory_committed_kb,
+    SUM(awe_allocated_kb) as awe_allocated_kb,
+    SUM(shared_memory_reserved_kb) as shared_memory_reserved_kb,
+    SUM(shared_memory_committed_kb) as shared_memory_committed_kb
+FROM sys.dm_os_memory_clerks
+GROUP BY type, memory_node_id
+--------------------------------------------------------------------------------
+os_schedulers
+SET NOCOUNT ON
+SELECT 
+    [parent_node_id],
+    [scheduler_id],
+    [cpu_id],
+    [status],
+    [is_idle],
+    [preemptive_switches_count],
+    [context_switches_count],
+    [yield_count],
+    [current_tasks_count],
+    [runnable_tasks_count],
+    [work_queue_count],
+    [pending_disk_io_count]
+FROM sys.dm_os_schedulers
+WHERE scheduler_id < 128
+--------------------------------------------------------------------------------
+io_virtual_file_stats
+SELECT 
+    DB_NAME (f.database_id) AS database_name, f.database_id, f.name AS logical_file_name, f.[file_id], f.type_desc, 
+    CAST (CASE 
+        -- Handle UNC paths (e.g. '\\fileserver\readonlydbs\dept_dw.ndf' --> '\\fileserver\readonlydbs')
+        WHEN LEFT (LTRIM (f.physical_name), 2) = '\\' 
+            THEN LEFT (LTRIM (f.physical_name), CHARINDEX ('\', LTRIM (f.physical_name), CHARINDEX ('\', LTRIM (f.physical_name), 3) + 1) - 1)
+        -- Handle local paths (e.g. 'C:\Program Files\...\master.mdf' --> 'C:') 
+        WHEN CHARINDEX ('\', LTRIM(f.physical_name), 3) > 0 
+            THEN UPPER (LEFT (LTRIM (f.physical_name), CHARINDEX ('\', LTRIM (f.physical_name), 3) - 1))
+        ELSE f.physical_name
+    END AS nvarchar(255)) AS logical_disk, 
+    fs.num_of_reads, fs.num_of_bytes_read, fs.io_stall_read_ms, fs.num_of_writes, fs.num_of_bytes_written, 
+    fs.io_stall_write_ms, fs.size_on_disk_bytes
+FROM sys.dm_io_virtual_file_stats (default, default) AS fs
+INNER JOIN sys.master_files AS f ON fs.database_id = f.database_id AND fs.[file_id] = f.[file_id]
+Snippet#6 - Removes a Specific Plan from the Plan Cache by Specifying a Plan Handle.
+
+This script can be run in SQL 2005 and 2008 but only in 2008 can a plan_handle be provided as
+
+a parameter for FREEPROCCACHE. In 2005 running FREEPROCCACHE clears all the cached plans.
+
+
+
+--The following example will provide the plan_handles for the cached plans that contains the SQL
+--N'%SELECT "dbo"."tblTask"."TOP_TASK_ID"%'. You must then determine which plan_handle is the one
+--that should be used or make the SQL that is being searched for more specific.
+SELECT plan_handle, st.text
+FROM sys.dm_exec_cached_plans
+CROSS APPLY sys.dm_exec_sql_text(plan_handle) AS st
+WHERE text LIKE N'%SELECT "dbo"."tblTask"."TOP_TASK_ID"%';
+GO
+--The following example will remove the specific plan from the cache that was identified from the above query.
+--This is only for MS SQL 2008.
+DBCC FREEPROCCACHE (0x060007003E05782540E3A5CE010000000000000000000000);
+GO
+--For MS SQL 2005 run the following which will clear all the plans from the cache.
+DBCC FREEPROCCACHE;
+GO
+Snippet#7 - SQL Server Instance Start Time
+
+This script can be run in SQL 2005 and 2008
+
+
+
+--The following will display the SQL Server Instance Start Time.
+SELECT sqlserver_start_time FROM sys.dm_os_sys_info
+GO
+ 
+
+Snippet#8 - Maintenance Plans Manipulation via TSQL
+
+These scripts can be run in SQL Server 2005 and 2008.
+
+Use them if Sql Server Management Studio does not perform the manipulation you desire.
+
+
+
+USE msdb
+GO
+#List all Maintenance Plans within the active SQL Server.
+SELECT * FROM sysmaintplan_plans
+#Delete the maintenance plan based on the id listed from the above query.
+#Use this if SSMS is reporting an error.
+DELETE FROM sysmaintplan_log WHERE plan_id = @id
+DELETE FROM sysmaintplan_subplans WHERE plan_id = @id
+DELETE FROM sysmaintplan_plans WHERE id = @id
+#Update the Name of the Maintenance Plan.
+UPDATE sysmaintplan_plans SET name = '<NEW PLAN NAME>' where name='<OLD PLAN NAME>';
+#Query Information based on a Plan ID.
+select * FROM sysmaintplan_plans WHERE id ='<PLAN_ID>'
+select * FROM sysmaintplan_subplans WHERE plan_id ='<PLAN_ID>'
+#Change the Owner of the Maintenance Plan
+#First identify the SID of the owner you wish to change the owner to. 
+SELECT [name],[sid]  FROM [msdb].[sys].[sql_logins]
+#Update the Owner of the Maintenance Plan to the SID extracted from the above query.
+UPDATE msdb.dbo.sysssispackages
+SET [ownersid]=<SID of new owner>
+WHERE [name]='YourMaintPlanName'
+Snippet#9 - SQL Server Mirroring Endpoint Status
+
+This script can be run in SQL 2005 and 2008
+
+
+
+--The following will display the SQL Server Mirroring Endpoint Status.
+SELECT name, state_desc FROM sys.database_mirroring_endpoints 
+GO
+Snippet#10 - Decommission a server from MSSQL_CENTRAL
+
+This script can be run in SQL 2005 and 2008
+
+
+
+--Run this on MSSQL_CENTRAL
+--Replace <SERVER_NAME> with name of server
+--Will update Decommission_Date with the current date and time against the entry for the server
+UPDATE DBA_Maintenance.bcc.MSSQL_Server
+SET DBA_Maintenance.bcc.MSSQL_Server.Decommission_Date = GETDATE()
+WHERE Server_Name = '<SERVER_NAME>'
+GO
+--Run this on MSSQL_CENTRAL
+--Replace <SERVER_NAME> with name of server
+--Will update Decommission_Date with the current date and time against the entry for the databases for the server
+UPDATE DBA_Maintenance.bcc.MSSQL_Database
+SET DBA_Maintenance.bcc.MSSQL_Database.Decommission_Date = GETDATE()
+FROM DBA_Maintenance.bcc.MSSQL_Database
+INNER JOIN DBA_Maintenance.bcc.MSSQL_Server
+ON (DBA_Maintenance.bcc.MSSQL_Database.Server_ID = DBA_Maintenance.bcc.MSSQL_Server.Server_ID 
+AND DBA_Maintenance.bcc.MSSQL_Server.Server_Name = '<SERVER_NAME>')
+Snippet#11 - SQL Server latest Backup Status
+
+
+
+--Type='D' to check the Status for Full backup
+--Type='L' to check the Status for Transaction Log backup 
+select serverproperty ('servername'),a.name, case b.type
+       when 'D' then 'Full Database Backup'  
+               when 'I' THEN 'Differential Backup'  
+       WHEN 'L' THEN 'Log Backup'  
+   END AS Backup_Type,  
+ max(b.backup_finish_date) LastSuccessfulBackup,
+cast((getdate() - max(b.backup_finish_date)) as numeric(8, 2)) IntervalInDays
+from master..sysdatabases a
+LEFT OUTER JOIN msdb..backupset b ON a.name = b.database_name
+where type = 'D'
+group by a.name, b.type
+order by a.name, b.type 
+Snippet#12 - SQL Server Backup Progress Status
+
+This script can be run in SQL 2005,2008R2,2012
+
+
+
+SELECT A.NAME,B.TOTAL_ELAPSED_TIME/60000 AS [Running Time], 
+B.ESTIMATED_COMPLETION_TIME/60000 AS [Remaining], 
+B.PERCENT_COMPLETE as [%],(SELECT TEXT FROM sys.dm_exec_sql_text(B.SQL_HANDLE))AS COMMAND FROM 
+MASTER..SYSDATABASES A, sys.dm_exec_requests B 
+WHERE A.DBID=B.DATABASE_ID AND B.COMMAND LIKE '%BACKUP%' 
+order by percent_complete desc,B.TOTAL_ELAPSED_TIME/60000 desc 
+Snippet#13 - Output script to recreate users, role membership and object-level
+
+permissions for the nominated database
+
+This script can be run in SQL 2005,2008R2,2012
+
+
+
+USE [DBA_Maintenance]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/*
+Example:exec DBA_Maintenance.dbo.up_HelpDBPermissions '<DBName>'
+*/
+CREATE procedure [dbo].[up_HelpDBPermissions]
+  @dbname varchar(100)
+as 
+SET NOCOUNT ON
+declare @sqlqry varchar(4000)
+-- Script to recreate user-defined roles
+set @sqlqry = 
+'SELECT ''IF NOT EXISTS (SELECT * FROM ' + @dbname + '.sys.database_principals WHERE name = '''''' + name + '''''') CREATE ROLE ['' + name + '']; '' AS ''-- User Defined Roles'' 
+FROM  ' + @dbname + '.sys.database_principals
+WHERE type = ''R''
+and         is_fixed_role = 0
+and         principal_id <> 0'
+exec (@sqlqry)
+-- Script to grant logins user access to the database
+set @sqlqry = 
+'SELECT     CASE WHEN perm.state <> ''W'' THEN perm.state_desc ELSE ''GRANT'' END
+      + SPACE(1) + perm.permission_name + SPACE(1)
+      + SPACE(1) + ''TO'' + SPACE(1) + QUOTENAME(usr.name) COLLATE database_default
+      + CASE WHEN perm.state <> ''W'' THEN SPACE(0) ELSE SPACE(1) + ''WITH GRANT OPTION'' END + '';'' AS ''-- Database Level Permissions''
+FROM  ' + @dbname + '.sys.database_permissions AS perm
+      INNER JOIN
+      ' + @dbname + '.sys.database_principals AS usr
+      ON perm.grantee_principal_id = usr.principal_id
+WHERE perm.major_id = 0
+AND         usr.name <> ''dbo'' 
+ORDER BY perm.permission_name ASC, perm.state_desc ASC'
+exec (@sqlqry)
+-- Script to recreate role members
+set @sqlqry = 
+'SELECT     ''EXEC sp_addrolemember @rolename ='' 
+      + SPACE(1) + QUOTENAME(rle.name) + '', @membername ='' + SPACE(1) + QUOTENAME(usr.name) + '';'' AS ''-- Role Memberships''
+FROM  ' + @dbname + '.sys.database_role_members AS rm
+      INNER JOIN
+      ' + @dbname + '.sys.database_principals AS usr
+      ON rm.member_principal_id = usr.principal_id
+      INNER JOIN
+      ' + @dbname + '.sys.database_principals AS rle
+      ON rm.role_principal_id = rle.principal_id
+WHERE usr.name <> ''dbo'' 
+ORDER BY rm.role_principal_id ASC'
+exec (@sqlqry)
+-- Script to recreate object_level permissions
+set @sqlqry = 
+'SELECT     CASE WHEN perm.state <> ''W'' THEN perm.state_desc ELSE ''GRANT'' END
+      + SPACE(1) + perm.permission_name + SPACE(1) + ''ON '' + QUOTENAME(USER_NAME(obj.schema_id)) + ''.'' + QUOTENAME(obj.name) 
+      + CASE WHEN cl.column_id IS NULL THEN SPACE(0) ELSE ''('' + QUOTENAME(cl.name) + '')'' END
+      + SPACE(1) + ''TO'' + SPACE(1) + QUOTENAME(usr.name) COLLATE database_default + '';''
+      + CASE WHEN perm.state <> ''W'' THEN SPACE(0) ELSE SPACE(1) + ''WITH GRANT OPTION'' END AS ''-- Object Level Permissions''
+FROM  ' + @dbname + '.sys.database_permissions AS perm
+      INNER JOIN
+      ' + @dbname + '.sys.objects AS obj
+      ON perm.major_id = obj.[object_id]
+      INNER JOIN
+      ' + @dbname + '.sys.database_principals AS usr
+      ON perm.grantee_principal_id = usr.principal_id
+      LEFT JOIN
+      ' + @dbname + '.sys.columns AS cl
+      ON cl.column_id = perm.minor_id AND cl.[object_id] = perm.major_id
+WHERE usr.name <> ''dbo'' 
+ORDER BY perm.permission_name ASC, perm.state_desc ASC'
+exec (@sqlqry)
+go
+Snippet#14 - Script to find out the Disk Details
+
+
+
+ exec sp_configure 'show advanced options','1'
+ go
+ reconfigure
+ go
+ exec sp_configure 'Ole Automation Procedures','1'
+ go
+ reconfigure
+ go
+--Using the sp_OA methods...this can be saved to a file and then used by osql/sqlcmd which can in turn be used in a --FOR loop from the cmdshell...
+SET NOCOUNT ON
+go
+IF EXISTS (SELECT name FROM tempdb..sysobjects WHERE name = '##_DriveSpace')
+ DROP TABLE ##_DriveSpace
+IF EXISTS (SELECT name FROM tempdb..sysobjects WHERE name = '##_DriveInfo')
+ DROP TABLE ##_DriveInfo
+DECLARE @Result INT
+ , @objFSO INT
+ , @Drv INT 
+ , @cDrive VARCHAR(13) 
+ , @Size VARCHAR(50) 
+ , @Free VARCHAR(50)
+ , @Label varchar(10)
+CREATE TABLE ##_DriveSpace  
+ (
+   DriveLetter CHAR(1) not null
+ , FreeSpace VARCHAR(10) not null
+  )
+CREATE TABLE ##_DriveInfo
+ (
+ DriveLetter CHAR(1)
+ , TotalSpace bigint
+ , FreeSpace bigint
+ , Label varchar(10)
+ )
+INSERT INTO ##_DriveSpace 
+ EXEC master.dbo.xp_fixeddrives
+-- Iterate through drive letters.
+DECLARE  curDriveLetters CURSOR
+ FOR SELECT driveletter FROM ##_DriveSpace
+DECLARE @DriveLetter char(1)
+ OPEN curDriveLetters
+FETCH NEXT FROM curDriveLetters INTO @DriveLetter
+WHILE (@@fetch_status <> -1)
+BEGIN
+ IF (@@fetch_status <> -2)
+ BEGIN
+   SET @cDrive = 'GetDrive("' + @DriveLetter + '")' 
+   EXEC @Result = sp_OACreate 'Scripting.FileSystemObject', @objFSO OUTPUT 
+    IF @Result = 0  
+     EXEC @Result = sp_OAMethod @objFSO, @cDrive, @Drv OUTPUT 
+    IF @Result = 0  
+     EXEC @Result = sp_OAGetProperty @Drv,'TotalSize', @Size OUTPUT 
+    IF @Result = 0  
+     EXEC @Result = sp_OAGetProperty @Drv,'FreeSpace', @Free OUTPUT 
+    IF @Result = 0  
+     EXEC @Result = sp_OAGetProperty @Drv,'VolumeName', @Label OUTPUT 
+    IF @Result <> 0  
+     EXEC sp_OADestroy @Drv 
+     EXEC sp_OADestroy @objFSO 
+   SET @Size = (CONVERT(BIGINT,@Size) / 1048576 )
+   SET @Free = (CONVERT(BIGINT,@Free) / 1048576 )
+   INSERT INTO ##_DriveInfo
+    VALUES (@DriveLetter, @Size, @Free, @Label)
+ END
+ FETCH NEXT FROM curDriveLetters INTO @DriveLetter
+END
+CLOSE curDriveLetters
+DEALLOCATE curDriveLetters
+PRINT 'Drive information for server ' + @@SERVERNAME + '.'
+PRINT ''
+-- Produce report.
+SELECT DriveLetter
+ , Label
+ , FreeSpace AS [FreeSpace MB]
+ , (TotalSpace - FreeSpace) AS [UsedSpace MB]
+ , TotalSpace AS [TotalSpace MB]
+ , ((CONVERT(NUMERIC(9,0),FreeSpace) / CONVERT(NUMERIC(9,0),TotalSpace)) * 100) AS [Percentage Free]
+FROM ##_DriveInfo
+ORDER BY [DriveLetter] ASC 
+GO
+DROP TABLE ##_DriveSpace
+DROP TABLE ##_DriveInfo
+GO
+ sp_configure 'Ole Automation Procedures','0'
+ go
+ reconfigure
+ go
+ sp_configure 'show advanced options','0'
+ go
+ reconfigure
+ go
+Snippet#15 - - Check the SQL Server Services Status
+
+
+
+set nocount on
+CREATE TABLE #ServicesStatus
+( 
+myid int identity(1,1),
+serverName nvarchar(100) default @@serverName,
+serviceName varchar(100),
+Status varchar(50),
+checkdatetime datetime default (getdate())
+)
+INSERT #ServicesStatus (Status)
+EXEC xp_servicecontrol N'QUERYSTATE',N'MSSQLServer'
+update #ServicesStatus set serviceName = 'MSSQLServer' where myid = @@identity
+INSERT #ServicesStatus (Status)
+EXEC xp_servicecontrol N'QUERYSTATE',N'SQLServerAGENT'
+update #ServicesStatus set serviceName = 'SQLServerAGENT' where myid = @@identity
+select @@servername,serviceName, Status, checkdatetime from #ServicesStatus 
+drop table #ServicesStatus
+Snippet#16 - Script to find out the Service Account Details
+
+
+
+SELECT servicename as [Service Name], service_account as [Service Account Name]
+FROM   sys.dm_server_services
+GO
+Snippet#17 - Script to find out the TCP Port Details
+
+
+
+SELECT SERVERNAME = CONVERT(NVARCHAR(128),SERVERPROPERTY('SERVERNAME'))   
+,LOCAL_NET_ADDRESS AS 'IPAddressOfSQLServer'  
+,local_tcp_port  AS 'PortNumber' 
+ FROM SYS.DM_EXEC_CONNECTIONS WHERE SESSION_ID = @@SPID
+Snippet#18 - Script to find out the Trace Status
+
+
+
+ 
+DBCC TRACESTATUS
+GO
+Snippet#19 - Script to find out the Server Configuration
+
+
+
+select Name ,value as [Config_Value],value_in_use as [Config_Run_Value] from sys.configurations where name in
+ ('Ad Hoc Distributed Queries','Agent XPs','allow updates',
+'Database Mail XPs','default trace enabled','fill factor (%)','max degree of parallelism',
+'max server memory (MB)','min server memory (MB)','show advanced options','xp_cmdshell',
+'clr enabled','Ole Automation Procedures','remote admin connections') order by name
+go 
+Snippet#20 - Script to find out the Database Size and location
+
+
+
+select DB_Name(database_id) as [Database_Name],name as [Database Logical File Name],
+size*8/1024 as [Size in MB],
+physical_name as [Physical Location],state_desc as [Status]from sys.master_files
+go
+Snippet#21 - Script to find out the Server Level Privileges
+
+
+
+EXEC sp_helpsrvrolemember
+go
+Snippet#22 - Script to find out the Database Level Privileges
+
+
+
+DECLARE @DB_USers TABLE(DBName sysname, UserName sysname, LoginType sysname, 
+AssociatedRole varchar(max),create_date datetime,modify_date datetime)  
+INSERT @DB_USers EXEC sp_MSforeachdb  ' use [?] SELECT ''?'' AS DB_Name, case prin.name when ''dbo'' then prin.name + '' (''+ (select SUSER_SNAME(owner_sid) from master.sys.databases where name =''?'') + '')'' 
+else prin.name end AS UserName, prin.type_desc AS LoginType, 
+isnull(USER_NAME(mem.role_principal_id),'''') AS AssociatedRole ,
+create_date,modify_date FROM sys.database_principals 
+prin LEFT OUTER JOIN sys.database_role_members mem ON prin.principal_id=mem.member_principal_id WHERE prin.sid IS NOT NULL and prin.sid NOT IN (0x00) and prin.is_fixed_role <> 1 AND prin.name NOT LIKE ''##%''' 
+SELECT  DBName,UserName ,LoginType ,create_date ,modify_date ,  
+ STUFF(   (  SELECT ',' + CONVERT(VARCHAR(500),AssociatedRole)  
+ FROM @DB_USers user2  WHERE user1.DBName=user2.DBName 
+ AND user1.UserName=user2.UserName  FOR XML PATH('')   )   ,1,1,'') 
+ AS Permissions_user  
+ FROM @DB_USers user1  GROUP BY  DBName,UserName ,LoginType ,create_date ,modify_date  ORDER BY DBName,UserName
+Snippet#23 - Script to transfer logins and passwords between instances of SQL Server (SQL Server 2005,2008 R2,2012)
+
+
+
+--Note This script creates two stored procedures in the master database. The procedures are named 
+-- sp_hexadecimal and sp_help_revlogin.
+USE master
+GO
+IF OBJECT_ID ('sp_hexadecimal') IS NOT NULL
+  DROP PROCEDURE sp_hexadecimal
+GO
+CREATE PROCEDURE sp_hexadecimal
+    @binvalue varbinary(256),
+    @hexvalue varchar (514) OUTPUT
+AS
+DECLARE @charvalue varchar (514)
+DECLARE @i int
+DECLARE @length int
+DECLARE @hexstring char(16)
+SELECT @charvalue = '0x'
+SELECT @i = 1
+SELECT @length = DATALENGTH (@binvalue)
+SELECT @hexstring = '0123456789ABCDEF'
+WHILE (@i <= @length)
+BEGIN
+  DECLARE @tempint int
+  DECLARE @firstint int
+  DECLARE @secondint int
+  SELECT @tempint = CONVERT(int, SUBSTRING(@binvalue,@i,1))
+  SELECT @firstint = FLOOR(@tempint/16)
+  SELECT @secondint = @tempint - (@firstint*16)
+  SELECT @charvalue = @charvalue +
+    SUBSTRING(@hexstring, @firstint+1, 1) +
+    SUBSTRING(@hexstring, @secondint+1, 1)
+  SELECT @i = @i + 1
+END
+SELECT @hexvalue = @charvalue
+GO
+IF OBJECT_ID ('sp_help_revlogin') IS NOT NULL
+  DROP PROCEDURE sp_help_revlogin
+GO
+CREATE PROCEDURE sp_help_revlogin @login_name sysname = NULL AS
+DECLARE @name sysname
+DECLARE @type varchar (1)
+DECLARE @hasaccess int
+DECLARE @denylogin int
+DECLARE @is_disabled int
+DECLARE @PWD_varbinary  varbinary (256)
+DECLARE @PWD_string  varchar (514)
+DECLARE @SID_varbinary varbinary (85)
+DECLARE @SID_string varchar (514)
+DECLARE @tmpstr  varchar (1024)
+DECLARE @is_policy_checked varchar (3)
+DECLARE @is_expiration_checked varchar (3)
+DECLARE @defaultdb sysname
+IF (@login_name IS NULL)
+  DECLARE login_curs CURSOR FOR
+      SELECT p.sid, p.name, p.type, p.is_disabled, p.default_database_name, l.hasaccess, l.denylogin FROM 
+sys.server_principals p LEFT JOIN sys.syslogins l
+      ON ( l.name = p.name ) WHERE p.type IN ( 'S', 'G', 'U' ) AND p.name <> 'sa'
+ELSE
+  DECLARE login_curs CURSOR FOR
+      SELECT p.sid, p.name, p.type, p.is_disabled, p.default_database_name, l.hasaccess, l.denylogin FROM 
+sys.server_principals p LEFT JOIN sys.syslogins l
+      ON ( l.name = p.name ) WHERE p.type IN ( 'S', 'G', 'U' ) AND p.name = @login_name
+OPEN login_curs
+FETCH NEXT FROM login_curs INTO @SID_varbinary, @name, @type, @is_disabled, @defaultdb, @hasaccess, @denylogin
+IF (@@fetch_status = -1)
+BEGIN
+  PRINT 'No login(s) found.'
+  CLOSE login_curs
+  DEALLOCATE login_curs
+  RETURN -1
+END
+SET @tmpstr = '/* sp_help_revlogin script '
+PRINT @tmpstr
+SET @tmpstr = '** Generated ' + CONVERT (varchar, GETDATE()) + ' on ' + @@SERVERNAME + ' */'
+PRINT @tmpstr
+PRINT ''
+WHILE (@@fetch_status <> -1)
+BEGIN
+  IF (@@fetch_status <> -2)
+  BEGIN
+    PRINT ''
+    SET @tmpstr = '-- Login: ' + @name
+    PRINT @tmpstr
+    IF (@type IN ( 'G', 'U'))
+    BEGIN -- NT authenticated account/group
+      SET @tmpstr = 'CREATE LOGIN ' + QUOTENAME( @name ) + ' FROM WINDOWS WITH DEFAULT_DATABASE = [' + @defaultdb + ']'
+    END
+    ELSE BEGIN -- SQL Server authentication
+        -- obtain password and sid
+            SET @PWD_varbinary = CAST( LOGINPROPERTY( @name, 'PasswordHash' ) AS varbinary (256) )
+        EXEC sp_hexadecimal @PWD_varbinary, @PWD_string OUT
+        EXEC sp_hexadecimal @SID_varbinary,@SID_string OUT
+        -- obtain password policy state
+        SELECT @is_policy_checked = CASE is_policy_checked WHEN 1 THEN 'ON' WHEN 0 THEN 'OFF' ELSE NULL END FROM sys.sql_logins WHERE name = @name
+        SELECT @is_expiration_checked = CASE is_expiration_checked WHEN 1 THEN 'ON' WHEN 0 THEN 'OFF' ELSE NULL END FROM sys.sql_logins WHERE name = @name
+            SET @tmpstr = 'CREATE LOGIN ' + QUOTENAME( @name ) + ' WITH PASSWORD = ' + @PWD_string + ' HASHED, SID = ' + @SID_string + ', DEFAULT_DATABASE = [' + @defaultdb + ']'
+        IF ( @is_policy_checked IS NOT NULL )
+        BEGIN
+          SET @tmpstr = @tmpstr + ', CHECK_POLICY = ' + @is_policy_checked
+        END
+        IF ( @is_expiration_checked IS NOT NULL )
+        BEGIN
+          SET @tmpstr = @tmpstr + ', CHECK_EXPIRATION = ' + @is_expiration_checked
+        END
+    END
+    IF (@denylogin = 1)
+    BEGIN -- login is denied access
+      SET @tmpstr = @tmpstr + '; DENY CONNECT SQL TO ' + QUOTENAME( @name )
+    END
+    ELSE IF (@hasaccess = 0)
+    BEGIN -- login exists but does not have access
+      SET @tmpstr = @tmpstr + '; REVOKE CONNECT SQL TO ' + QUOTENAME( @name )
+    END
+    IF (@is_disabled = 1)
+    BEGIN -- login is disabled
+      SET @tmpstr = @tmpstr + '; ALTER LOGIN ' + QUOTENAME( @name ) + ' DISABLE'
+    END
+    PRINT @tmpstr
+  END
+  FETCH NEXT FROM login_curs INTO @SID_varbinary, @name, @type, @is_disabled, @defaultdb, @hasaccess, @denylogin
+   END
+CLOSE login_curs
+DEALLOCATE login_curs
+RETURN 0
+GO
+--Run the following statement: 
+EXEC sp_help_revlogin
+Snippet#24 - SQL Server Database Consistency
+
+
+
+*The time to perform this procedure is dependent on the size of the database
+*Checks the logical and physical integrity of all the objects in the specified database by performing the following operations:
+*Runs DBCC CHECKALLOC on the database.
+*Runs DBCC CHECKTABLE on every table and view in the database.
+*Runs DBCC CHECKCATALOG on the database.
+Validates the contents of every indexed view in the database.
+Validates link-level consistency between table metadata and file system directories and files when storing varbinary(max) data in the file system using FILESTREAM.
+Validates the Service Broker data in the database.
+*Run the following SQL once connected to the SQL instance hosting the database replacing <DATABASE> with the name of the database being checked:
+DBCC CHECKDB (<DATABASE>);
