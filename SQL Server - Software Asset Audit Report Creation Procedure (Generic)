@@ -1,0 +1,241 @@
+Actions
+Refresh the database SCCM_2007 and SCCM_2012 located in M903PRD1, with the latest backup available.
+
+Use Below Scripts to fetch the data
+
+Fetch the SCCM_2007_AllPrograms data. Execute the scripts in Database Central
+
+
+
+Drop Table Database_Central.dbo.SCCM_2007_AllPrograms
+Go
+SELECT        dbo.v_R_System_Valid.Netbios_Name0, 
+                     dbo.v_R_System_Valid.User_Name0, 
+                     dbo.v_Add_Remove_Programs.Publisher0, 
+            dbo.v_Add_Remove_Programs.DisplayName0, 
+                     dbo.v_Add_Remove_Programs.Version0, 
+                     dbo.v_Add_Remove_Programs.InstallDate0
+INTO		Database_Central.dbo.SCCM_2007_AllPrograms
+FROM       dbo.v_R_System_Valid INNER JOIN
+            dbo.v_Add_Remove_Programs ON dbo.v_R_System_Valid.ResourceID = dbo.v_Add_Remove_Programs.ResourceID INNER JOIN
+            dbo.v_CM_RES_COLL_SMSDM003 ON dbo.v_R_System_Valid.ResourceID = dbo.v_CM_RES_COLL_SMSDM003.ResourceID
+ORDER BY dbo.v_Add_Remove_Programs.Publisher0
+GO
+Filter the current table, SCCM_2007_AllPrograms with Exclusions
+
+
+
+Drop table SCCM_2007_AllPrograms_Filtered_Data
+GO
+SELECT 
+SCCM_2007_AllPrograms.Netbios_Name0, SCCM_2007_AllPrograms.User_Name0, 
+SCCM_2007_AllPrograms.Publisher0, SCCM_2007_AllPrograms.DisplayName0, 
+SCCM_2007_AllPrograms.Version0, SCCM_2007_AllPrograms.InstallDate0 
+INTO [SCCM_2007_AllPrograms_Filtered_Data]
+FROM SCCM_2007_AllPrograms 
+LEFT JOIN [Database_Central].dbo.Exclusions 
+ON SCCM_2007_AllPrograms.[DisplayName0] = [Database_Central].dbo.Exclusions.[Excluded Software]
+WHERE (((SCCM_2007_AllPrograms.Publisher0) Not Like 'Brisbane City Council'
+And (SCCM_2007_AllPrograms.Publisher0) Not Like 'Tortoise%' 
+And (SCCM_2007_AllPrograms.Publisher0) Not Like '%Transport and Main Roads%' 
+And (SCCM_2007_AllPrograms.Publisher0) Not Like '%Wireshark%') 
+AND ((SCCM_2007_AllPrograms.DisplayName0) Not Like 'Null' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Security Update%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Hotfix%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Reader%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Adobe Flash Player%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Driver%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%NVIDIA%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Redistributable%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Language Pack%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Runtime%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Microsoft .NET%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Update for Microsoft%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'BCC%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%HP%jet%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Firefox%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Python%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'crystalreports%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Update for Windows%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'tp.%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Microsoft App Update%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Java%SE%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Java(T%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Java%Update%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Media Player%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Service Pack%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%ActiveX%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '7-Zip%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like 'Free DWG Viewer%' 
+And (SCCM_2007_AllPrograms.DisplayName0) Not Like '%Catalyst Control Center%'))
+AND (([Database_Central].[dbo].[Exclusions].[Excluded Software]) Is Null)
+ORDER BY SCCM_2007_AllPrograms.Publisher0, SCCM_2007_AllPrograms.DisplayName0;
+Fetch the SCCM_2012_AllPrograms data
+
+
+
+Drop table SCCM_2012_AllPrograms
+go
+SELECT        dbo.v_R_System_Valid.Netbios_Name0, 
+                     dbo.v_R_System_Valid.User_Name0, 
+                     dbo.v_Add_Remove_Programs.Publisher0, 
+            dbo.v_Add_Remove_Programs.DisplayName0, 
+                     dbo.v_Add_Remove_Programs.Version0, 
+                     dbo.v_Add_Remove_Programs.InstallDate0
+INTO		SCCM_2012_AllPrograms
+FROM        dbo.v_R_System_Valid INNER JOIN
+            dbo.v_Add_Remove_Programs ON dbo.v_R_System_Valid.ResourceID = dbo.v_Add_Remove_Programs.ResourceID INNER JOIN
+            dbo.v_CM_RES_COLL_SMSDM003 ON dbo.v_R_System_Valid.ResourceID = dbo.v_CM_RES_COLL_SMSDM003.ResourceID
+ORDER BY dbo.v_Add_Remove_Programs.Publisher0
+GO
+Filter SCCM_2012_AllPrograms with exclusions.Execute the queries in Database Central
+
+
+
+Drop table SCCM_2012_AllPrograms_Filtered_Data
+GO
+SELECT 
+SCCM_2012_AllPrograms.Netbios_Name0, SCCM_2012_AllPrograms.User_Name0, 
+SCCM_2012_AllPrograms.Publisher0, SCCM_2012_AllPrograms.DisplayName0, 
+SCCM_2012_AllPrograms.Version0, SCCM_2012_AllPrograms.InstallDate0 
+INTO [SCCM_2012_AllPrograms_Filtered_Data]
+FROM SCCM_2012_AllPrograms 
+LEFT JOIN [Database_Central].dbo.Exclusions 
+ON SCCM_2012_AllPrograms.[DisplayName0] = [Database_Central].dbo.Exclusions.[Excluded Software] collate Latin1_General_CI_AS
+WHERE (((SCCM_2012_AllPrograms.Publisher0) Not Like 'Brisbane City Council'
+And (SCCM_2012_AllPrograms.Publisher0) Not Like 'Tortoise%' 
+And (SCCM_2012_AllPrograms.Publisher0) Not Like '%Transport and Main Roads%' 
+And (SCCM_2012_AllPrograms.Publisher0) Not Like '%Wireshark%') 
+AND ((SCCM_2012_AllPrograms.DisplayName0) Not Like 'Null' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Security Update%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Hotfix%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Reader%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Adobe Flash Player%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Driver%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%NVIDIA%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Redistributable%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Language Pack%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Runtime%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Microsoft .NET%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Update for Microsoft%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'BCC%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%HP%jet%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Firefox%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Python%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'crystalreports%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Update for Windows%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'tp.%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Microsoft App Update%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Java%SE%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Java(T%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Java%Update%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Media Player%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Service Pack%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%ActiveX%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '7-Zip%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like 'Free DWG Viewer%' 
+And (SCCM_2012_AllPrograms.DisplayName0) Not Like '%Catalyst Control Center%'))
+AND (([Database_Central].[dbo].[Exclusions].[Excluded Software]) Is Null)
+ORDER BY SCCM_2012_AllPrograms.Publisher0, SCCM_2012_AllPrograms.DisplayName0;
+Fetch the SCCM 2012 Data Visio and Project using collid
+
+
+
+truncate table SCCM2012_APPLICATION_EXCLUDED_DATA
+Go
+	-- This Script is Developed by HCL Technologies version V.0
+	-- This Script will fetch data  from v_R_System,v_Add_Remove_Programs,v_FullCollectionMembership,v_R_User in accordance with CollId.
+Declare @displayname nvarchar(7),@CollID nvarchar(8), @Publisher0 nvarchar(50)
+Declare Coll_cursor Cursor for 
+Select ColID from [dbo].[collID] -- This will select the CollID from collID table
+open Coll_cursor
+Fetch next from Coll_cursor into @CollID
+while @@FETCH_STATUS = 0
+Begin  
+Set @displayname ='%Visio%'
+set @Publisher0 ='Microsoft Corporation'
+INSERT INTO [SCCM2012_APPLICATION_EXCLUDED_DATA] -- This insertion will instert the data into SCCM_2012_Application_Excluded_data
+SELECT	sys.Netbios_Name0, 
+		sys.User_Name0,
+		@Publisher0 as Publisher0,
+		arp.DisplayName0,
+		arp.Version0,
+		arp.InstallDate0
+FROM				dbo.v_R_System AS sys 
+INNER JOIN			dbo.v_Add_Remove_Programs AS arp ON sys.ResourceID = arp.ResourceID 
+INNER JOIN			dbo.v_FullCollectionMembership AS fcm ON sys.ResourceID = fcm.ResourceID 
+Left Outer JOIN		dbo.v_R_User U ON sys.User_Name0 = U.User_Name0 
+WHERE  
+		arp.DisplayName0 like @displayname 
+ AND	fcm.CollectionID = @CollID
+ AND	arp.displayname0 NOT IN (select * from [dbo].[Exclusion2012]) --This will match condition for Excluded Application from table Exclusion2012
+Fetch next from Coll_cursor into @CollID
+End
+Close Coll_cursor
+Deallocate Coll_cursor
+	-- This Script is Developed by HCL Technologies version V.0
+	-- This Script will fetch data  from v_R_System,v_Add_Remove_Programs,v_FullCollectionMembership,v_R_User in accordance with CollId.
+Declare @displayname nvarchar(7),@CollID nvarchar(8), @Publisher0 nvarchar(50)
+Declare Coll_cursor Cursor for 
+Select ColID from [dbo].[collID] -- This will select the CollID from collID table
+open Coll_cursor
+Fetch next from Coll_cursor into @CollID
+while @@FETCH_STATUS = 0
+Begin  
+Set @displayname ='%Visio%'
+set @Publisher0 ='Microsoft Corporation'
+INSERT INTO [SCCM2012_APPLICATION_EXCLUDED_DATA] -- This insertion will instert the data into SCCM_2012_Application_Excluded_data
+SELECT	sys.Netbios_Name0, 
+		sys.User_Name0,
+		@Publisher0 as Publisher0,
+		arp.DisplayName0,
+		arp.Version0,
+		arp.InstallDate0
+FROM				dbo.v_R_System AS sys 
+INNER JOIN			dbo.v_Add_Remove_Programs AS arp ON sys.ResourceID = arp.ResourceID 
+INNER JOIN			dbo.v_FullCollectionMembership AS fcm ON sys.ResourceID = fcm.ResourceID 
+Left Outer JOIN		dbo.v_R_User U ON sys.User_Name0 = U.User_Name0 
+WHERE  
+		arp.DisplayName0 like @displayname 
+ AND	fcm.CollectionID = @CollID
+ AND	arp.displayname0 NOT IN (select * from [dbo].[Exclusion2012]) --This will match condition for Excluded Application from table Exclusion2012
+Fetch next from Coll_cursor into @CollID
+End
+Close Coll_cursor
+Deallocate Coll_cursor
+Merge 2012_All_Programs_Filtered_data with 2012_Visio_and_Project_data
+
+
+
+Drop Table SCCM2012_All_extracted_Data
+Go
+Select * into SCCM2012_All_extracted_Data
+from  [dbo].[SCCM_2012_AllPrograms_Filtered_Data]
+Go
+Insert into SCCM2012_All_extracted_Data
+select * from [dbo].[SCCM_2012_Project_And_Visio_Data]
+GO
+Merge 2007_All_Programs_Filtered data with 2012_All_Programs_Filtered_data and 2012_Visio_and_Project_data.
+
+
+
+Drop Table [dbo].[SCCM2007_2012_All_extracted_Data]
+Go
+Select * into Database_Central.[dbo].[SCCM2007_2012_All_extracted_Data]
+from  [SCCM_2007_AllPrograms_Filtered_Data]
+Go
+Insert into Database_Central.[dbo].[SCCM2007_2012_All_extracted_Data]
+select * from  [dbo].[SCCM2012_All_extracted_Data]
+GO
+Retrieve the final data using below script and paste the result in Excel and share with Shantanu Sharma
+
+
+
+USE [Database_Central]
+GO
+/****** Script for SelectTopNRows command from SSMS  ******/
+SELECT [Netbios_Name0]
+      ,[User_Name0]
+      ,[Publisher0]
+      ,REPLACE(DisplayName0, '"', ' ') as DisplayName0
+      ,[Version0]
