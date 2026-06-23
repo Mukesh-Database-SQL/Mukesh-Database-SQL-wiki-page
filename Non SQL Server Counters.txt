@@ -1,0 +1,151 @@
+This XML file does not appear to have any style information associated with it. The document tree is shown below.
+<DataCollectorSet>
+<Status>0</Status>
+<Duration>0</Duration>
+<Description> </Description>
+<DescriptionUnresolved> </DescriptionUnresolved>
+<DisplayName> </DisplayName>
+<DisplayNameUnresolved> </DisplayNameUnresolved>
+<SchedulesEnabled>-1</SchedulesEnabled>
+<LatestOutputLocation>E:\PerfLogs\Admin\Non SQL Server Counters\M413PRD1_20120503-000008</LatestOutputLocation>
+<Name>Non SQL Server Counters</Name>
+<OutputLocation>E:\PerfLogs\Admin\Non SQL Server Counters\M413PRD1_20120503-000009</OutputLocation>
+<RootPath>E:\PerfLogs\Admin\Non SQL Server Counters</RootPath>
+<Segment>0</Segment>
+<SegmentMaxDuration>0</SegmentMaxDuration>
+<SegmentMaxSize>0</SegmentMaxSize>
+<SerialNumber>9</SerialNumber>
+<Server> </Server>
+<Subdirectory> </Subdirectory>
+<SubdirectoryFormat>3</SubdirectoryFormat>
+<SubdirectoryFormatPattern>yyyyMMdd\-NNNNNN</SubdirectoryFormatPattern>
+<Task> </Task>
+<TaskRunAsSelf>0</TaskRunAsSelf>
+<TaskArguments> </TaskArguments>
+<TaskUserTextArguments> </TaskUserTextArguments>
+<UserAccount>SYSTEM</UserAccount>
+<Security>O:BAG:DUD:AI(A;;FA;;;SY)(A;;FA;;;BA)(A;;FR;;;LU)(A;;0x1301ff;;;S-1-5-80-2661322625-712705077-2999183737-3043590567-590698655)(A;ID;FA;;;SY)(A;ID;FA;;;BA)(A;ID;0x1200ab;;;LU)(A;ID;FR;;;AU)(A;ID;FR;;;LS)(A;ID;FR;;;NS)</Security>
+<StopOnCompletion>0</StopOnCompletion>
+<PerformanceCounterDataCollector>
+<DataCollectorType>0</DataCollectorType>
+<Name>DataCollector01</Name>
+<FileName>DataCollector01</FileName>
+<FileNameFormat>1</FileNameFormat>
+<FileNameFormatPattern> </FileNameFormatPattern>
+<LogAppend>0</LogAppend>
+<LogCircular>0</LogCircular>
+<LogOverwrite>0</LogOverwrite>
+<LatestOutputLocation>E:\PerfLogs\Admin\Non SQL Server Counters\M413PRD1_20120503-000008\DataCollector01.blg</LatestOutputLocation>
+<DataSourceName> </DataSourceName>
+<SampleInterval>15</SampleInterval>
+<SegmentMaxRecords>0</SegmentMaxRecords>
+<LogFileFormat>3</LogFileFormat>
+<Counter>\LogicalDisk(F:)\Avg. Disk Queue Length</Counter>
+<Counter>\LogicalDisk(G:)\Avg. Disk Queue Length</Counter>
+<Counter>\LogicalDisk(I:)\Avg. Disk Queue Length</Counter>
+<Counter>\LogicalDisk(J:)\Avg. Disk Queue Length</Counter>
+<Counter>\LogicalDisk(K:)\Avg. Disk Queue Length</Counter>
+<Counter>\LogicalDisk(L:)\Avg. Disk Queue Length</Counter>
+<Counter>\LogicalDisk(F:)\Avg. Disk sec/Transfer</Counter>
+<Counter>\LogicalDisk(G:)\Avg. Disk sec/Transfer</Counter>
+<Counter>\LogicalDisk(I:)\Avg. Disk sec/Transfer</Counter>
+<Counter>\LogicalDisk(J:)\Avg. Disk sec/Transfer</Counter>
+<Counter>\LogicalDisk(K:)\Avg. Disk sec/Transfer</Counter>
+<Counter>\LogicalDisk(L:)\Avg. Disk sec/Transfer</Counter>
+<Counter>\PhysicalDisk(3 F:)\Avg. Disk Read Queue Length</Counter>
+<Counter>\PhysicalDisk(4 G:)\Avg. Disk Read Queue Length</Counter>
+<Counter>\PhysicalDisk(6 I:)\Avg. Disk Read Queue Length</Counter>
+<Counter>\PhysicalDisk(7 J:)\Avg. Disk Read Queue Length</Counter>
+<Counter>\PhysicalDisk(8 K:)\Avg. Disk Read Queue Length</Counter>
+<Counter>\PhysicalDisk(9 L:)\Avg. Disk Read Queue Length</Counter>
+<Counter>\PhysicalDisk(3 F:)\Avg. Disk sec/Read</Counter>
+<Counter>\PhysicalDisk(4 G:)\Avg. Disk sec/Read</Counter>
+<Counter>\PhysicalDisk(6 I:)\Avg. Disk sec/Read</Counter>
+<Counter>\PhysicalDisk(7 J:)\Avg. Disk sec/Read</Counter>
+<Counter>\PhysicalDisk(8 K:)\Avg. Disk sec/Read</Counter>
+<Counter>\PhysicalDisk(9 L:)\Avg. Disk sec/Read</Counter>
+<Counter>\PhysicalDisk(3 F:)\Avg. Disk sec/Write</Counter>
+<Counter>\PhysicalDisk(4 G:)\Avg. Disk sec/Write</Counter>
+<Counter>\PhysicalDisk(6 I:)\Avg. Disk sec/Write</Counter>
+<Counter>\PhysicalDisk(7 J:)\Avg. Disk sec/Write</Counter>
+<Counter>\PhysicalDisk(8 K:)\Avg. Disk sec/Write</Counter>
+<Counter>\PhysicalDisk(9 L:)\Avg. Disk sec/Write</Counter>
+<Counter>\PhysicalDisk(3 F:)\Avg. Disk Write Queue Length</Counter>
+<Counter>\PhysicalDisk(4 G:)\Avg. Disk Write Queue Length</Counter>
+<Counter>\PhysicalDisk(6 I:)\Avg. Disk Write Queue Length</Counter>
+<Counter>\PhysicalDisk(7 J:)\Avg. Disk Write Queue Length</Counter>
+<Counter>\PhysicalDisk(8 K:)\Avg. Disk Write Queue Length</Counter>
+<Counter>\PhysicalDisk(9 L:)\Avg. Disk Write Queue Length</Counter>
+<Counter>\Memory\Available MBytes</Counter>
+<Counter>\Memory\Page Faults/sec</Counter>
+<Counter>\Memory\Pages/sec</Counter>
+<Counter>\Paging File\*</Counter>
+<Counter>\Process(_Total)\% Processor Time</Counter>
+<Counter>\Process(sqlservr)\% Processor Time</Counter>
+<Counter>\Process(sqlservr#1)\% Processor Time</Counter>
+<Counter>\Process(sqlservr#2)\% Processor Time</Counter>
+<Counter>\Process(*)\% Processor Time</Counter>
+<Counter>\Processor(_Total)\% Privileged Time</Counter>
+<Counter>\Processor(_Total)\% Processor Time</Counter>
+<Counter>\Processor(_Total)\% User Time</Counter>
+<CounterDisplayName>\LogicalDisk(F:)\Avg. Disk Queue Length</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(G:)\Avg. Disk Queue Length</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(I:)\Avg. Disk Queue Length</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(J:)\Avg. Disk Queue Length</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(K:)\Avg. Disk Queue Length</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(L:)\Avg. Disk Queue Length</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(F:)\Avg. Disk sec/Transfer</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(G:)\Avg. Disk sec/Transfer</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(I:)\Avg. Disk sec/Transfer</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(J:)\Avg. Disk sec/Transfer</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(K:)\Avg. Disk sec/Transfer</CounterDisplayName>
+<CounterDisplayName>\LogicalDisk(L:)\Avg. Disk sec/Transfer</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(3 F:)\Avg. Disk Read Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(4 G:)\Avg. Disk Read Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(6 I:)\Avg. Disk Read Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(7 J:)\Avg. Disk Read Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(8 K:)\Avg. Disk Read Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(9 L:)\Avg. Disk Read Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(3 F:)\Avg. Disk sec/Read</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(4 G:)\Avg. Disk sec/Read</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(6 I:)\Avg. Disk sec/Read</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(7 J:)\Avg. Disk sec/Read</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(8 K:)\Avg. Disk sec/Read</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(9 L:)\Avg. Disk sec/Read</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(3 F:)\Avg. Disk sec/Write</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(4 G:)\Avg. Disk sec/Write</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(6 I:)\Avg. Disk sec/Write</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(7 J:)\Avg. Disk sec/Write</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(8 K:)\Avg. Disk sec/Write</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(9 L:)\Avg. Disk sec/Write</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(3 F:)\Avg. Disk Write Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(4 G:)\Avg. Disk Write Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(6 I:)\Avg. Disk Write Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(7 J:)\Avg. Disk Write Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(8 K:)\Avg. Disk Write Queue Length</CounterDisplayName>
+<CounterDisplayName>\PhysicalDisk(9 L:)\Avg. Disk Write Queue Length</CounterDisplayName>
+<CounterDisplayName>\Memory\Available MBytes</CounterDisplayName>
+<CounterDisplayName>\Memory\Page Faults/sec</CounterDisplayName>
+<CounterDisplayName>\Memory\Pages/sec</CounterDisplayName>
+<CounterDisplayName>\Paging File\*</CounterDisplayName>
+<CounterDisplayName>\Process(_Total)\% Processor Time</CounterDisplayName>
+<CounterDisplayName>\Process(sqlservr)\% Processor Time</CounterDisplayName>
+<CounterDisplayName>\Process(sqlservr#1)\% Processor Time</CounterDisplayName>
+<CounterDisplayName>\Process(sqlservr#2)\% Processor Time</CounterDisplayName>
+<CounterDisplayName>\Process(*)\% Processor Time</CounterDisplayName>
+<CounterDisplayName>\Processor(_Total)\% Privileged Time</CounterDisplayName>
+<CounterDisplayName>\Processor(_Total)\% Processor Time</CounterDisplayName>
+<CounterDisplayName>\Processor(_Total)\% User Time</CounterDisplayName>
+</PerformanceCounterDataCollector>
+<DataManager>
+<Enabled>0</Enabled>
+<CheckBeforeRunning>0</CheckBeforeRunning>
+<MinFreeDisk>0</MinFreeDisk>
+<MaxSize>0</MaxSize>
+<MaxFolderCount>0</MaxFolderCount>
+<ResourcePolicy>0</ResourcePolicy>
+<ReportFileName>report.html</ReportFileName>
+<RuleTargetFileName>report.xml</RuleTargetFileName>
+<EventsFileName> </EventsFileName>
+</DataManager>
+</DataCollectorSet>
