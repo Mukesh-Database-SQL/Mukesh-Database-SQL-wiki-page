@@ -1,0 +1,21 @@
+Actions
+This procedure assumes the data drive is F: drive and the transaction log drive is G: drive.
+This also assumes that the transaction log files for the MASTER, MODEL & MSDB files are located on the F: drive.
+
+Determine when the files went missing by looking in the Application Event Log.
+
+Change the browse time in Networker(with the help of storage team) to some time just before the deletion occurred.
+
+Select the folders to be recovered and recover
+
+This will just recreated the directory structure and associated permissions.
+
+Start the SQL Server Service
+
+This will recreate the templog.ldf file.
+
+Start the SQL Agent service
+
+Log into SQL Server Management Studio. The user databases will need to be recovered.
+
+Using Networker User for SQL Server recover the user databases.
