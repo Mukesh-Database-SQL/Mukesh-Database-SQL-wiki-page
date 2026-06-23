@@ -1,0 +1,255 @@
+Login to MSSQL_CENTRAL (M903PRD1).
+
+Monthly Report(Baseline)
+
+To Create Monthly report, run the below query
+
+
+
+Use Database_Central
+Go
+Select * from bcc.df_MSSQL_Monthly_Reporting
+Go
+SQL Server Status
+
+To Check the Status of each SQL Server instances take the RDP on MSSQL_CENTRAL and run the below query:
+
+
+
+use Database_Central
+go
+select Computer_Name as [Host_Name],server_Name as [SQL Server Instance Name],
+Environment,Last_Modified_Date [Last Modified Date], 
+CASE WHEN DATEDIFF(day, Last_Modified_Date, GETDATE()) < 2 THEN 'OK' ELSE 'NOT OK' END AS [Server Status]
+from bcc.MSSQL_Server where Decommission_Date IS NULL and support='HCL'
+order by Server_Name
+Database Status
+
+To Check the database status of each database
+
+
+
+use Database_Central
+go
+select s.server_Name as [SQL Server Instance Name], d.Database_Name,d.Status,
+case is_auto_close_on
+when 1 then 'ON'
+when 0 then 'OFF'
+end as [Auto Close]
+from bcc.MSSQL_Database d, bcc.MSSQL_Server s where
+s.Server_ID=d.Server_ID and d.decommission_date IS NULL
+Database Count (HCL, BASE R1, BASE R2) and analysis count use for Monthly Report
+
+
+
+DECLARE @end_date datetime
+SET @end_date = '2016-06-10'
+SELECT a.System_Code, b.Infrastructure_Type, b.Computer_Name, (CASE 
+            WHEN b.Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN b.Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN b.Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN b.Product_Version like '11%' THEN 'SQL Server 2012'
+	    WHEN b.Product_Version like '12%' THEN 'SQL Server 2014'
+            WHEN b.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version, a.Database_Name, CAST((a.Database_Size_MBs/1024.0) AS decimal(10,6)) AS Database_Size_GBs,
+a.Application_Name, b.Environment, b.Support, c.DataCenter, a.status,
+b.Server_Name, a.Creation_Date, b.Mainstream_Support
+from bcc.mssql_server b
+join bcc.mssql_database a
+on a.server_id = b.server_id
+join bcc.MSSQL_Datacenter_details c
+on b.Computer_Name = c.Computer_Name
+where a.database_name NOT IN ('model','msdb','DBA_Maintenance','tempdb','master')
+and a.decommission_date is NULL
+and b.decommission_date IS NULL
+and c.Instance_Name = b.Server_Name
+and a.first_recorded_date <= @end_date
+UNION
+select NULL AS System_Code, b.Infrastructure_Type, b.Computer_Name, (CASE 
+            WHEN b.Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN b.Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN b.Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN b.Product_Version like '11%' THEN 'SQL Server 2012'
+	    WHEN b.Product_Version like '12%' THEN 'SQL Server 2014'
+            WHEN b.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version, a.Analysis_Database_Name, 
+CAST((a.analysis_database_size_MBs/1024.0) AS Decimal(10,6)) AS Database_Size_GBs,
+a.Application_Name, b.Environment, b.Support, c.DataCenter, a.status,
+b.Analysis_Server_Name, a.First_Recorded_Date, b.Mainstream_Support
+from bcc.mssql_analysis_server b
+join bcc.mssql_analysis_database a
+on a.analysis_server_id = b.analysis_server_id
+join bcc.MSSQL_datacenter_details c
+on b.Computer_Name = c.Computer_Name
+and a.decommission_date iS NULL
+and b.decommission_date IS NULL
+and a.first_recorded_date <= @end_date
+Total User Database Count at Council (Use this query to send Monthly Database Count to Shannon Cupitt)
+
+
+
+use Database_Central
+go
+select * from bcc.MSSQL_Server where support is null and decommission_date is null
+go
+update bcc.MSSQL_Server set support = 'BASE R2' where Server_Name='<Server_Name>'
+go
+--Check the SQL Instance decommission status. There could be issue with the Job - [Update SQL Server Central] need 
+--to connect through SSMS to verify the Server decommission Status. 
+select * from bcc.MSSQL_Server where support ='BASE R2' and decommission_date is not null
+go
+Declare @End_Date Datetime
+Select @End_Date = '2013-11-30' -- Last Day of the Month
+select s.Computer_Name,s.server_name as [SQL Server Instance Name],d.Database_Name,d.Application_Name
+from bcc.MSSQL_Database d, Database_central.bcc.MSSQL_Server s 
+where s.Server_ID = d.Server_ID
+and d.decommission_date is null 
+and d.First_Recorded_date<=@End_Date
+and d.Database_Name not in ('tempdb','model', 'msdb', 'master','DBA_Maintenance')
+and d.Database_Snapshot IS NULL 
+Total User Database Count (HCL and BASE)
+
+
+
+use Database_Central
+go
+select s.Computer_Name,s.Server_Name as [SQL Server Instance Name],(CASE 
+            WHEN s.Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN s.Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN s.Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN s.Product_Version like '11%' THEN 'SQL Server 2012'
+	    WHEN b.Product_Version like '12%' THEN 'SQL Server 2014'
+            WHEN b.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version,d.Database_Name,d.Application_Name,s.Environment,s.support
+from bcc.MSSQL_Database d, Database_central.bcc.MSSQL_Server s 
+where s.Server_ID = d.Server_ID
+and d.decommission_date is null 
+and s.support not in ('Sirsi Dynix')
+and d.Database_Name not in ('tempdb','model', 'msdb', 'master','DBA_Maintenance')
+and d.Database_Snapshot IS NULL 
+Database Count for BASE (Accenture)
+
+
+
+use Database_Central
+go
+select s.Computer_Name,s.Failover_Cluster,s.Server_Name as [SQL Server Instance Name],s.Edition,
+s.Product_Level,(CASE 
+            WHEN s.Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN s.Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN s.Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN s.Product_Version like '11%' THEN 'SQL Server 2012'
+	    WHEN b.Product_Version like '12%' THEN 'SQL Server 2014'
+            WHEN b.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version,d.decommission_date,
+d.Database_Name,d.Application_Name,s.Environment,s.support
+,d.First_Recorded_date
+from bcc.MSSQL_Database d, bcc.MSSQL_Server s 
+where s.Server_ID = d.Server_ID
+--and d.decommission_date is null --this is not applicable in case of BASE, until we fix the Database Maintenance job
+and s.support = '%BASE%' 
+and d.Database_Name not in ('tempdb','model', 'msdb', 'master','DBA_Maintenance')
+order by s.Computer_Name
+Database creation in specific time interval
+
+
+
+use Database_Central
+go
+Declare @Start_Date Datetime
+Declare @End_Date Datetime
+Select @Start_Date = '2019-04-01' -- First Day of the Month
+Select @End_Date = '2019-05-01' -- Last Day of the Month
+select s.Computer_Name,s.Server_Name as [SQL Server Instance Name],(CASE 
+            WHEN s.Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN s.Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN s.Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN s.Product_Version like '11%' THEN 'SQL Server 2012'
+	    WHEN s.Product_Version like '12%' THEN 'SQL Server 2014'
+	    WHEN s.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version,d.Database_Name,d.Application_Name,s.Environment,d.First_Recorded_date,s.Support
+from bcc.MSSQL_Database d, bcc.MSSQL_Server s 
+where s.Server_ID = d.Server_ID
+and d.decommission_date is null 
+and s.support not in ('Sirsi Dynix')
+and (d.First_Recorded_date >= @Start_Date and d.First_Recorded_date <=@End_Date)
+and d.Database_Name not in ('tempdb','model', 'msdb', 'master','DBA_Maintenance')
+and d.Database_Snapshot IS NULL 
+Database decommission in specific time interval
+
+
+
+use Database_Central
+go
+Declare @Start_Date Datetime
+Declare @End_Date Datetime
+Select @Start_Date = '2013-10-01' -- First Day of the Month
+Select @End_Date = '2013-10-31' -- Last Day of the Month
+select s.Computer_Name,s.Server_Name as [SQL Server Instance Name],(CASE 
+            WHEN s.Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN s.Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN s.Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN s.Product_Version like '11%' THEN 'SQL Server 2012'
+            WHEN b.Product_Version like '12%' THEN 'SQL Server 2014'
+            WHEN b.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version,d.Database_Name,d.Application_Name,s.Environment,d.decommission_date,s.support
+from bcc.MSSQL_Database d, Database_central.bcc.MSSQL_Server s 
+where s.Server_ID = d.Server_ID
+and d.decommission_date is not null 
+and s.support not in ('Sirsi Dynix')
+and (d.decommission_date >= @Start_Date and d.decommission_date <=@End_Date)
+and d.Database_Name not in ('tempdb','model', 'msdb', 'master','DBA_Maintenance')
+and d.Database_Snapshot IS NULL 
+Check when the MSSQL Central last updated
+
+
+
+use Database_Central
+go
+select Computer_Name,Server_Name as [SQL Server Instance Name],(CASE 
+            WHEN Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN Product_Version like '11%' THEN 'SQL Server 2012'
+	    WHEN b.Product_Version like '12%' THEN 'SQL Server 2014'
+            WHEN b.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version,
+      Support,Last_Modified_Date
+from Database_Central.bcc.MSSQL_Server
+where decommission_date is null 
+and s.support not in ('Sirsi Dynix')
+order by last_Modified_Date desc
+Database Backup Status (Not Backed up more than 2 day's)
+
+
+
+use Database_Central
+go
+select s.Computer_Name,s.Server_Name as [SQL Server Instance Name],(CASE 
+            WHEN s.Product_Version like '8.0%' THEN 'SQL Server 2000'
+            WHEN s.Product_Version like '9.0%' THEN 'SQL Server 2005'
+            WHEN s.Product_Version like '10.50%' THEN 'SQL Server 2008 R2'
+            WHEN s.Product_Version like '11%' THEN 'SQL Server 2012'
+	    WHEN b.Product_Version like '12%' THEN 'SQL Server 2014'
+            WHEN b.Product_Version like '13%' THEN 'SQL Server 2016'
+      ELSE NULL END) Product_Version,d.Database_Name,d.Status,d.Recovery_Model,d.Last_Database_Backup_Date,
+      d.Last_Database_Log_Backup_Date, s.Environment,s.support
+from bcc.MSSQL_Database d, Database_central.bcc.MSSQL_Server s 
+where s.Server_ID = d.Server_ID
+and d.decommission_date is null 
+and s.support not in ('Sirsi Dynix')
+and d.Database_Name not in ('tempdb')
+and d.Database_Snapshot IS NULL and Status='ONLINE' 
+and Last_Database_Backup_Date<getdate()-2
+Find the list of applications in which Database Mirroring is configured
+
+
+
+use Database_Central
+go
+select s.Server_Name as [SQL Server Instance Name],d.Database_Name,d.Application_Name,s.Environment
+from bcc.MSSQL_Database d, bcc.MSSQL_Server s 
+where s.Server_ID = d.Server_ID
+and d.decommission_date is null 
+and s.Mirroring_Status='MIRRORING'
+and d.Database_Name not in ('tempdb','model', 'msdb', 'master','DBA_Maintenance')
