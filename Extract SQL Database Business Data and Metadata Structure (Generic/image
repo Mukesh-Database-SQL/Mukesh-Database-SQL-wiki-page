@@ -1,0 +1,130 @@
+Extract SQL Database Metadata Structure 
+
+Extract SQL Database Metadata Structure, Open SSMS on the delegate Server.
+
+Query to share Table and View Information
+
+Use <db_name>
+go
+select * from INFORMATION_SCHEMA.TABLES
+
+Query to share Table Columns
+
+
+
+Use <db_name>
+go
+select * from INFORMATION_SCHEMA.COLUMNS
+Query to share Procedure and Function Metadata
+
+
+
+Use <db_name>
+go
+select * from INFORMATION_SCHEMA.ROUTINES
+Query to share Database and table size details
+
+
+
+Use <db_name>
+go
+sp_spaceused
+Query to share table occupied space
+
+
+
+Use <db_name>
+go
+sp_msforeachtable 'EXEC sp_spaceused [?]'
+Extract SQL Database Business Data 
+
+Open SSMS on the delegate server
+
+Connect to the database Server
+
+Procedure to backup the database and share with vendor 
+
+Backup Database by using below query
+
+
+
+Use <db_name>
+go
+Backup Database <database_name> to disk ='<Path\Database_name_YYYYMMDD.bak' with stats=10
+Share the password protected backup with Vendor on the shared location
+
+Password Protect the database backup 
+
+Right click on backup File.
+
+Go to 7-Zip,go to add to archive
+
+Select the compression Level to Store, add the password
+
+Share the password with Vendor over Call.
+
+Procedure to share the CSV document with Vendor
+
+Import Data without a Format File, using BCP utility 
+
+
+
+bcp <db_name>.<schema>.<table_name IN D:\BCP\<file>.bcp -T -c
+Import Data with a Non-XML Format File 
+
+
+
+bcp <db_name>.<schema>.<table_name> IN D:\BCP\file.bcp -f D:\BCP\file.fmt -T
+Import data using BULK INSERT and Character Format without a Format File 
+
+
+
+USE <Db_name>
+go
+BULK INSERT <db_name>.<schema>.<table_name>  
+   FROM 'abc.txt'
+WITH (
+        DATAFILETYPE = 'Char'
+        ); 
+GO
+Using BULK INSERT and Character Format with a Non-XML Format File 
+
+
+
+USE <Db_name>
+go
+BULK INSERT <db_name>.<schema>.<table_name>  
+   FROM 'abc.txt'
+WITH (
+        FORMATFILE = 'D:\BCP\file.fmt'
+        ); 
+GO
+Using OPEN ROWSET and Character Format with a Non-XML Format File 
+
+
+
+INSERT INTO <db_name>.<schema>.<table_name>
+    SELECT *
+    FROM OPENROWSET (
+        BULK 'D:\BCP\file.bcp', 
+        FORMATFILE = 'D:\BCP\file.fmt'  
+        ) AS t1;
+Export Data Using BCP Utility 
+
+Open the CMD prompt and enter the query below
+
+
+
+bcp <db_name>.<Schema>.<table> OUT D:\BCP\<name>.bcp -T -c
+to Review Result 
+
+
+
+NOTEPAD D:\BCP\<name>.bcp
+IMPORT AND EXPORT USING SSMS GUI
+
+Import using SQL Client, from <source_server> to <destination_Server> 
+
+Open SSMS
+
+Open Database, go to task, go to import 
