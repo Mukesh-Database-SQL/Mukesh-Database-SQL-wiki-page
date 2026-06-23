@@ -1,0 +1,157 @@
+Outcome#
+The purpose of this procedure is to refresh a Non production Database from a Production SQL Server Database. The length of time this procedure will take is dependent on the size of the database and the complexity of the post implementation tasks. For the minimal size 4 hours will be taken
+
+Prerequisites#
+The following are prerequisites for the successful completion of this procedure:
+Project Team/Application Team/ IMP Team raise the Service request to provide the Source and Destination SQL Server Instance and Database Name.
+Source SQL Server Instance Name/DNS Alias Name
+Database Name
+Destination SQL Server Instance Name/DNS Alias Name
+Data team will check the capacity to the Destination Server and if required request the Project Team/Application Team/ IMP Team to get capacity approval and expand the disk space.
+Data team will raise the Standard Change within ITSM7 raised with the standard change template, INF072 - CA15/182890 with appropriate notes attached to the change.
+Check the available free space on E Drive on both Source and Destination SQL Server.
+Actions#
+Review the application page in the database wiki for any specific notes for Database refresh.
+
+To facilitate the refresh mechanism for various applications, the following table will be used to highlight to the DBA subtle differences in refreshing environments for a given application.
+
+Notes on Stopping and Starting Database	Reset SQL Server Login Passwords	Relink SQL Server Logins to DB User Logins	Recreate Application Objects	Deprod Steps
+YES	NO	YES	NO	Yes (See Notes Below)
+
+Valid values for the above tables include YES, NO, YES (See Notes Below)
+
+
+Notes on Stopping and Starting Database - If set to YES or YES (See Notes Below) then the database has special notes for shutting down and starting up the database for refreshes. (Highlights Possible Dependencies on Technology Stack and other environments - Integration, Middleware, Application Tier etc)
+Reset SQL Server Login Passwords - If set to YES then all passwords in the target instance need to be restored to the original value after the refresh. If set to YES (See Notes Below) then notes exist below which identify all the sql server logins to have passwords restored.
+Relink SQL Server Logins to DB User Logins - If set to YES then all SQL Server Logins in the target instance will be relinked to existing database users after the refresh.
+Recreate Application Objects - If set to YES (See Notes Below) then Application Objects will need to be saved off and recreated in the target database after the refresh is performed. Refer to the notes provided.
+Deprod Steps - If set to YES (See Notes Below) then Additional DE pornification Steps need to be undertaken to complete the refresh of the environment. Refer to the notes provided.
+
+If the values are set to NO then the generic steps for a refresh should be followed.
+Source Server (Version SQL Server 2016/2017/2019)
+
+Check the available free space on E Drive if not then shift to nas-ds
+Create a folder on E:\Backup\<CRQ>\
+Take the SQL Server Native Backup of source database with COPY_ONLY option on source server E:\Backup\CRQ\DATABASE_NAME_SRC.BAK> or in
+nas-ds\SQL_Server_DB_Backups if E drive doesn't have sufficient free space.
+BACKUP DATABASE [DATABASE_NAME] TO DISK ='E:\Backup\CRQ\DATABASE_NAME_SRC.BAK'
+WITH STATS=1,COPY_ONLY, COMPRESSION
+Copy the Database backup file from Source Server E:\Backup\CRQ\DATABASE_NAME_SRC.BAK to Destination Server.
+Take the source database table count using below query
+CREATE TABLE #counts
+(
+    table_name varchar(255),
+    row_count int
+)
+
+EXEC sp_MSForEachTable @command1='INSERT #counts (table_name, row_count) 
+SELECT ''?'', COUNT(*) FROM ?'
+SELECT table_name, row_count FROM #counts 
+ORDER BY table_name, row_count DESC
+DROP TABLE #counts
+Destination Server (Version SQL Server 2016/2017/2019)
+Note: If Destination Instance is configured with Always on Availability then remove Always on Availability prior to refresh and reconfigure after refresh
+Script out the permission of destination database by running following Stored Procedure and save into notepad to the destination folder.
+exec DBA_Maintenance..up_helpdbpermissions '<DBName>'
+Note: If you are not able to find Stored procedure up_helpdbpermissions
+Take the SQL Server Native Backup of destination database prior to refresh on destination server E:\Backup\CRQ_yyyymmdd\DATABASE_NAME_DEST.BAK>
+BACKUP DATABASE [DB_NAME] TO DISK ='E:\Backup\CRQ_yyyymmdd\DATABASE_NAME_DEST.BAK'
+WITH STATS=10, COMPRESSION
+Check the Database Owner of Current Database.
+Make sure Logical and physical file name is same on both source and Destination database.
+Check the physical file location of Destination database.
+If you see any active connection on Destination Database, arrange for application Tier to be stopped.
+--Check the Active Connection
+SELECT 
+    DB_NAME(dbid) as DBName, hostname,
+    COUNT(dbid) as NumberOfConnections,
+    loginame as LoginName
+FROM
+    master..sysprocesses
+WHERE 
+    dbid > 0
+GROUP BY 
+    dbid, loginame,hostname
+go
+Verify the Database Backup (RESTORE VERIFYONLY.../RESTORE FILELISTONLY)
+RESTORE FILELISTONLY FROM DISK=E:\Backup\CRQ\DATABASE_NAME_SRC.BAK'
+Restore the database with REPLACE on existing Database physical location
+RESTORE DATABASE [DATABASE_NAME]
+FROM DISK=E:\Backup\CRQ\DATABASE_NAME_SRC.BAK'
+WITH MOVE 'LOGICAL_NAME' TO 'PHYSICAL_LOCATION_DESTINATION,
+MOVE 'LOGICAL_NAME' TO 'PHYSICAL_LOCATION_DESTINATION',
+STATS=10, REPLACE
+Execute the script (output) taken for existing permission.
+Remove the orphan users if any
+--To Detect orphan users
+use <DATABASE_NAME>
+Go
+exec sp_change_users_login 'Report'
+Go 
+
+--To Resolve the orphan users
+
+--The following command relinks the server login with the database user.
+ 
+use <DATABASE_NAME>
+Go
+
+DECLARE @username varchar(25)
+DECLARE fixusers CURSOR
+FOR
+SELECT UserName = name FROM sysusers
+WHERE issqluser = 1 and (sid is not null and sid <> 0x0)
+and suser_sname(sid) is null
+and name <> 'dbo' 
+ORDER BY name
+OPEN fixusers
+FETCH NEXT FROM fixusers
+INTO @username
+WHILE @@FETCH_STATUS = 0
+BEGIN
+EXEC sp_change_users_login 'update_one', @username, @username
+FETCH NEXT FROM fixusers
+INTO @username
+END CLOSE fixusers
+DEALLOCATE fixusers
+Remove the Source database users
+DROP USER [USER_NAME]
+Change the Database Owner
+use <DATABASE_NAME>
+go
+sp_changedbowner '<SQL Server Login>'
+go
+use <DATABASE_NAME>
+go
+exec sp_updatestats
+go
+Compare the table count from Source tables
+CREATE TABLE #counts
+(
+    table_name varchar(255),
+    row_count int
+)
+
+EXEC sp_MSForEachTable @command1='INSERT #counts (table_name, row_count) 
+SELECT ''?'', COUNT(*) FROM ?'
+SELECT table_name, row_count FROM #counts 
+ORDER BY table_name, row_count DESC
+DROP TABLE #counts
+Note: In Case of Allocate365 Refresh or Restore, Verify the Service Broker. Service Broker must be Enabled.
+To Check the Service Broker Status run the below script
+SELECT is_broker_enabled FROM sys.databases WHERE name = 'Allocate365';
+To Enable Service Broker Run Below script
+ALTER DATABASE Allocate365 SET ENABLE_BROKER WITH ROLLBACK IMMEDIATE
+
+ALTER DATABASE Allocate365 SET ENABLE_BROKER;
+
+After Enabling Service Broker Set Trustworthy On
+ALTER DATABASE Allocate365 SET TRUSTWORTHY ON
+
+Confirmation#
+Confirm Application user after successful refresh.
+Arrange for application Tier to be started and confirm connections are in the refresh database on the target SQL Database Server.
+Remove the Database backup folder from Source Server and Destination Server.
+Configure Always On Availability, on the Database in the target SQL Server providing this is appropriate.
+Rollback#
+Restore the Backup taken prior to refresh the database on Destination Server (E:\Backup\CRQ\DATABASE_NAME_DEST.BAK')
