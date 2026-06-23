@@ -1,0 +1,24 @@
+Actions
+RDP to the database server and connect to the database instance using SQL Server Management Studio (SSMS). Run the activity monitor and make sure there are no connections to the database.
+
+Right click on the database and select Properties and then select the File page. Note the location of the transaction log file. Click OK to close.
+
+Right click on the database, select Tasks and then select Detach
+
+Click OK to detach
+
+Navigate to the folder that contains the transaction log file. Right click on the transaction log file and select Cut.
+
+Navigate to the folder that will contain the transaction log file. Right click on an area of white-space and select Paste.
+
+In SSMS right click on Databases and select Attach.
+
+Click Add.
+
+Locate the .MDF file and click OK.
+
+Locate the .LDF file (transaction log file) and click OK.
+
+Click OK
+
+Finally run the sp_helpfile to check the log file location.
