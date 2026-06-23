@@ -177,3 +177,189 @@ Please direct your response back to this email to OS-IS-dddataengineering@brisba
 Regards
 Data Team
  
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Outcome
+This procedure outlines the steps to add a TDE-encrypted database to an AlwaysOn Availability Group.
+
+If you have an encrypted database, you can add it to an existing Availability Group without using the wizard.
+
+Prerequisites
+The following are prerequisites for the successful completion of this procedure:
+
+Approved change within BMC Helix with appropriate notes attached to the change.
+
+An existing AlwaysOn Availability Group must have at least one Primary and one Secondary replica instance.
+
+A TDE-encrypted database must reside on the same instance as the primary replica, ensuring it is online and accessible.
+
+A Database Master Key is required on all replica servers hosting the availability group, as the primary server already has one due to its TDE encrypted database.
+
+Actions
+The following actions will occur when adding the TDE encrypted database to the availability group. 
+
+Verify that each secondary replica instance has a Database Master Key (DMK) in the master database. Create a new DMK if missing.
+
+On the primary replica instance, back up the certificate used for TDE encryption.
+
+Create the TDE certificate on each secondary replica instance using the backed-up certificate from the primary.
+
+Create a full backup of the TDE-encrypted database on the primary replica instance.
+
+Create a transaction log backup of the TDE-encrypted database on the primary replica instance.
+
+Add the TDE-encrypted database to the Availability Group on the primary replica instance.
+
+On each secondary replica instance, restore the full backup (with no recovery).
+
+On each secondary replica instance, restore the transaction log backup (with no recovery).
+
+On each secondary replica instance, join the database to the Availability Group.
+
+Verify that each secondary replica instance has a Database Master Key (DMK) in the master database. If a DMK is missing, create one using the script below. 
+
+
+
+USE MASTER 
+GO 
+SELECT * FROM sys.symmetric_keys
+WHERE name = '##MS_DatabaseMasterKey##'
+If DMK does not exist, create it using the following script. 
+
+
+
+Use Master
+Go
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = ‘#############'
+Note:The Service Master Key is the foundation of the SQL Server encryption hierarchy. It is automatically generated the first time it is required to encrypt another key. By default, the Service Master Key is encrypted with the Windows Data Protection API using the local machine key. Only the Windows service account that created it or a principal with access to both the service account name and password can open the Service Master Key.
+
+If the DMK exists and you don't know the password, ensure the service account running SQL Server has SA permissions and can access the key.
+
+You don't need the same database master key on each SQL instance. There's no requirement to back up the DMK from the primary and restore it on the secondary. As long as each secondary has a DMK, that instance is ready for the server certificate.
+
+If your instances lack DMKs and you are creating them, you do not need to use the same password for each instance. You can use the TSQL command, CREATE MASTER KEY, on each instance independently with a different password. However, you may also use the same password across instances.
+
+The DMK encrypts certificates and other keys to protect them, not databases. Using different DMKs for each instance will not create encryption or decryption issues.
+
+Create a backup of the certificate used for TDE encryption on the primary replica instance. 
+
+To decrypt the TDE-encrypted database on a secondary replica instance, it must have a copy of the certificate from the primary instance used for encryption. There may be multiple certificates installed on the primary replica. To identify the correct certificate to back up, run the following query on the primary and locate the certificate name next to the database you want to add to the availability group: 
+
+
+
+USE master 
+GO 
+SELECT db_name(database_id) [TDE Encrypted DB Name], c.name as CertName, encryptor_thumbprint 
+    FROM sys.dm_database_encryption_keys dek 
+    INNER JOIN sys.certificates c on dek.encryptor_thumbprint = c.thumbprint
+Backup the certificate using the TSQL command BACKUP CERTIFICATE on the primary server.
+
+
+
+BACKUP CERTIFICATE <ServerName>_<InstanceName>_TDE_Certificate
+TO FILE = 'E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate'
+WITH PRIVATE KEY 
+(
+file='E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate_Key.pvk',
+ENCRYPTION BY PASSWORD = '#######'
+)
+GO
+The BACKUP CERTIFICATE command creates two files: the server certificate and a password-protected private key file. Both files and the password are necessary for restoring the certificate on other instances. If no path is specified during the backup, the certificate and private key files will be saved in the instance's data folder (“F:\MSSQL11.MSSQLSERVER\MSSQL\DATA”). 
+
+Note: If the server certificate has been backed up and the password for the private key file is unknown, create a new backup by issuing the BACKUP CERTIFICATE command and specifying a new password. This new password will apply to the newly created files..
+
+Create the TDE Certificate on each secondary replica instance using the certificate backed up from the primary.
+
+This step will use the backup to restore the certificate on each secondary replica instance. The backup consists of two files: the server certificate (in this example, “TDE_DB_EncryptionCert”) and the private key file, which is protected by a password. Use these two files along with the password in the TSQL command CREATE CERTIFICATE to recreate the server certificate on the other secondary replicas. After copying the files to Secondary, connect to a query window on Secondary and execute the following TSQL command: 
+
+
+
+USE MASTER
+GO
+CREATE CERTIFICATE \<ServerName>_<InstanceName>_TDE_Certificate'
+FROM FILE = 'E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate'
+WITH PRIVATE KEY (
+FILE = 'E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate_Key.pvk',
+DECRYPTION BY PASSWORD = '#########' 
+);
+Install the server certificate on Secondary. Repeat for any additional secondary replica instances. This certificate must be present on all replicas, including the primary and all secondary instances.
+
+Create a full database backup of the TDE-encrypted database on the primary replica instance (Primary). 
+
+You can use TSQL or the SSMS GUI to create a full backup. 
+
+
+
+USE master 
+Go 
+BACKUP DATABASE <Database_Name> TO DISK = 'E:\Backup\<Database_Name>_Full.bak';
+Create a transaction log backup of the TDE-encrypted database on the primary replica instance. 
+
+
+
+USE master 
+Go 
+BACKUP LOG <Database_Name> TO DISK = 'E:\Backup\<Database_Name>_Log.trn';
+Add the TDE encrypted database to the Availability Group on the primary replica instance. 
+
+Note: Database will be added through script only.
+
+Issue an ALTER AVAILABILITY GROUP command on the primary for the availability group (AG_Name). 
+
+
+
+USE master 
+Go 
+ALTER AVAILABILITY GROUP [AG_Name] ADD DATABASE [<Database_Name>]
+This will add the encrypted database to the primary replica of the availability group named AG_Name. 
+
+Restore the full backup from Step Four on each secondary replica instance without recovery. 
+
+
+
+USE master 
+Go 
+RESTORE DATABASE <Database_Name> FROM DISK = 'E:\Backup\<Database_Name>_full.bak' WITH NORECOVERY;
+Repeat step seven for all secondary replica instances if multiple exist.
+
+On each secondary replica instance, restore the transaction log backup (from Step Five) with no recovery 
+
+
+
+USE master 
+Go 
+RESTORE LOG <Database_Name> FROM DISK = 'E:\Backup\<Database_Name>_log.trn' WITH NORECOVERY;
+Repeat this step for all secondary replica instances if multiple exist.
+
+Join the database to the availability group on each secondary replica instance. 
+
+Note: Database will be added through script only.
+
+Join the database to the availability group for synchronization by issuing the following TSQL statement: 
+
+
+
+USE master 
+Go 
+ALTER DATABASE <Database_Name> SET HADR AVAILABILITY GROUP = [AG_Name];
+ Confirmation
+On the Primary and Secondary Replicas, review encryption by running the following queries on both. 
+
+
+
+USE MASTER;
+GO
+SELECT db.name,db.is_encrypted,dm.encryption_state,dm.percent_complete,
+dm.key_algorithm,dm.key_length
+FROM sys.databases db
+LEFT OUTER JOIN 
+sys.dm_database_encryption_keys dm
+ON db.database_id = dm.database_id;
+GO
+Output Details 
+
+Is_encrypted: A return value of "1" in the is_encrypted column of the sys.databases catalog view indicates successful encryption of the database using TDE.
+
+Encryption state: A return value of "2" indicates that the encryption process is in progress. A return value of "3" means the encryption process is complete.
+
+Percent complete: The percent_complete shows the progress of the encryption process. 
