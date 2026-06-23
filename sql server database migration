@@ -1,0 +1,370 @@
+Pre Work
+Actions
+Perform Database and infrastructure health check
+
+Check Last Night Successful Full and Transaction Log backup:
+
+
+
+select serverproperty ('servername'),a.name, case b.type 
+       when 'D' then 'Full Database Backup'  
+               when 'I' THEN 'Differential Backup'  
+       WHEN 'L' THEN 'Log Backup'  
+   END AS Backup_Type,  
+ max(b.backup_finish_date) LastSuccessfulBackup, 
+cast((getdate() - max(b.backup_finish_date)) as numeric(8, 2)) IntervalInDays 
+from master..sysdatabases a 
+LEFT OUTER JOIN msdb..backupset b ON a.name = b.database_name 
+where 
+--a.name not in ('master','msdb','model','tempdb','DBA_Maintenance') and 
+type = 'D' --Replace D from L to Transaction Log Backup
+group by a.name, b.type 
+order by a.name, b.type
+Check database status:
+
+
+
+use master
+go 
+	select serverproperty ('servername') as [Instance Name],
+	name as [Database Name],state_desc as [Status] ,user_access_desc as [User Access Desc],
+	case is_auto_close_on
+	when 1 then 'ON'
+	when 0 then 'OFF'
+	end as [Auto Close]
+	from sys.databases
+Check SQL Server Error Log for any application login failure:
+
+Check Windows application event log:
+
+Determine Storage/Memory and Processor requirements of the source database. Allocate additional storage to the destination target server if required.
+
+Determine infrastructure components within the scope of the database movement:
+
+Compatibility level
+
+Collation Level
+
+Application related databases.
+
+SQL Server Logins associated with affected databases.
+
+Jobs and Maintenance Plans related to the database.
+
+Server Objects used by logic within the affected database.
+
+Check the following stored procedures are present in the master database:
+
+sp_help_revlogin (For migration from SQL Server 2005 to above)
+
+sp_hexadecimal
+
+Run the below commands in SQL Query Analyser to check if the objects exist.
+
+
+
+select OBJECT_ID ('sp_hexadecimal')
+select OBJECT_ID ('sp_help_revlogin')
+If either script above returns NULL then copy the script from the following Code Page Section
+
+ section to create Store procedure "sp_help_revlogin".
+
+Ensure Service accounts of the target SQL Server have access to all the supporting infrastructure.
+
+Identify fragmented indexes that can be rebuilt as part of the migration process.
+
+
+
+SELECT *
+INTO DBA_Maintenance.bcc.index_maintenance_requests
+FROM sys.dm_db_index_physical_stats (NULL, NULL, NULL , NULL, 'LIMITED')
+WHERE avg_fragmentation_in_percent > 10 AND index_id > 0;
+Script out all the application jobs/Maintenance Plans and server objects that needs to be migrated to target server.
+
+ 
+
+If the source SQL server is 2005 or above then run the following in SQL Server Management Studio on the source database server.
+
+
+
+--Run the sp_help_revlogin SP. The output script generates is the login script. 
+--This login script creates the logins that have the original Security Identifier
+--(SID) and the original password. Extract the users you need from the output of the script below.
+use master
+exec sp_help_revlogin
+GO
+For the Windows Logins, note the access the login has to the database. This login will need to be added to the destination server and the access granted to the database once it exists on the destination server.
+
+Collect information about database-level principals in the current database.
+
+
+
+use <DBName>
+go
+sp_helpuser
+go
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Database Migration Procedure
+
+Actions
+Disable specific database monitoring of the affected databases or send a message for DC Ops team / Monitoring team to disable the Database monitoring from the SQL Server Instance. (If applicable)
+
+Arrange for application Tier to be stopped.(If applicable) Refer to the application specific notes on who does this.
+
+Disable all application jobs (if any) in the source SQL Server once they have completed running.
+
+Disable the Application SQL Server Login in the SQL Server if it is related to only particular database. This is to ensure Middle tiers other than the application tier cannot access database and cause an error in the log.
+
+Once all connections to the database have been closed (i.e.. no active connections into the source database)then commence the migration work. Otherwise confirm with application support that the application tier is down. You can check whether connections exist into the database via activity monitor or running the below query in a query window.
+If connections are persistent and unexplained then issue the kill command or kill the session from within SQL Server Management Studio (SSMS).
+
+
+
+SELECT 
+    DB_NAME(dbid) as DBName, hostname,
+    COUNT(dbid) as NumberOfConnections,
+    loginame as LoginName
+FROM
+    master..sysprocesses
+WHERE 
+    dbid > 0
+GROUP BY 
+    dbid, loginame,hostname
+go
+Script out the table count of the database being migrated
+
+
+
+CREATE TABLE #counts
+(
+    table_name varchar(255),
+    row_count int
+)
+EXEC sp_MSForEachTable @command1='INSERT #counts (table_name, row_count) 
+SELECT ''?'', COUNT(*) FROM ?'
+SELECT table_name, row_count FROM #counts 
+ORDER BY table_name, row_count DESC
+DROP TABLE #counts
+ 
+
+Script out all the application jobs/Maintenance Plans and server objects that needs to be migrated to target server.
+
+For the SQL Logins, create the Clone Logins Script to run in the destination server if not covered under Pre-Work Task
+
+Create a folder on E:\Backup\<CRQ_yyyymmdd> or the drive in with sufficient free space available
+
+Backup of the database on Backup drive.
+
+
+
+BACKUP DATABASE [DATABASE_NAME] TO DISK ='E:\Backup\CRQ_yyyymmdd\DATABASE_NAME.BAK'
+WITH STATS=10,COMPRESSION
+Offline the Source Database.
+
+Go to Run "<Target Server>\E$\Backup\" and copy the Database backup file from Source Server to Destination Server.
+
+Verify the Database Backup (RESTORE VERIFYONLY) (optional)
+
+Run the RESTORE FILELISTONLY to see a list of the files that were backed up.
+
+
+
+RESTORE FILELISTONLY FROM DISK=E:\Backup\CRQ_yyyymmdd\DATABASE_NAME.BAK'
+Restore the database to the the Target SQL Server Instance on same location where other data and log files exist// or
+
+Restore the database with the new name (As per Council Standard)/Vendor provided name and new physical file name.
+
+
+
+RESTORE DATABASE [DATABASE_NAME]
+FROM DISK=E:\Backup\CRQ_yyyymmdd\DATABASE_NAME.BAK'
+WITH MOVE 'LOGICAL_NAME' TO 'PHYSICAL_LOCATION_DESTINATION,
+MOVE 'LOGICAL_NAME' TO 'PHYSICAL_LOCATION_DESTINATION',
+STATS=10
+Alter the Logical file name of database accordingly new database Name.
+
+Set the Auto grow size of data and log in (MB) for the database if it is not set properly. (Auto grow must be carefully evaluated)
+
+Ensure the database owner is the same as that nominated in the source SQL server.
+
+If you encounter any such error : The proposed new database owner is already a user or aliased in the database. Change the owner as 'sa'
+
+
+
+use <DATABASE_NAME>
+go
+sp_changedbowner '<SQL Server Login>/<sa>'
+go
+Re-validate the Database owner name, logical file name after making all the changes.
+
+Enable SQL Server Logins on the target SQL Database Server. If the SQL Server logins were not cloned the login id's in the source server are likely to be different to those in the target server and the database users become orphaned (disconnected from a login) after a migration. To resolve this use the system stored procedure to 're-connect' the user to a login. Orphaning can happen if the database user is mapped to a SID that is not present in the new server instance.
+
+
+
+--To Detect orphan users
+use <DATABASE_NAME>
+go
+exec sp_change_users_login 'Report'
+go 
+--To Resolve the orphan users
+1.The following command relinks the server login account specified by <login_name> with the database user specified by <database_user>. 
+exec sp_change_users_login 'Update_One','<SQL Server Login>','<Database User Name>'
+(we typically map users and logins to the same name)
+Confirm there are no physical or logical errors in database with DBCC
+
+
+
+use <DATABASE_NAME>
+go
+--Use the below command to quickly identify issues. Follow instructions provided by output.
+DBCC UPDATEUSAGE ('<DATABASE_NAME>')
+go
+Update all existing statistics with FULL sample Size.
+
+
+
+use <DATABASE_NAME>
+go
+EXEC sp_updatestats
+Rebuild all indexes identified from the Pre Work Activities.
+
+
+
+USE <DATABASE_NAME>
+GO
+EXEC sp_MSForEachTable 'ALTER INDEX ALL ON ? REBUILD WITH (FILLFACTOR = 90);'
+--If you are getting error in above command then Execute the below script 
+EXEC sp_MSForEachTable  'SET QUOTED_IDENTIFIER ON;
+ALTER INDEX ALL ON ? REBUILD WITH (FILLFACTOR = 90)' 
+Change the compatibility level based on Application compatibility level. Refer the Application Solution Document prior to change the compatibility level or check with Solution Architect.
+
+
+
+-- If the application supports SQL Server 2019
+USE [master]
+GO
+ALTER DATABASE [DATABASE_NAME] SET COMPATIBILITY_LEVEL = 150
+GO
+Change the Recovery Model of all the Production Databases to FULL.
+
+
+
+USE [master]
+GO
+ALTER DATABASE [DATABASE_NAME] SET RECOVERY FULL WITH NO_WAIT
+GO
+Perform a check database on the database migrated and address any issues found. Save off the report to the change as confirmation of a successful migration.
+
+
+
+use <DATABASE_NAME>
+go
+#Use the below command to quickly identify issues. Follow instructions provided by output.
+DBCC CHECKDB WITH NO_INFOMSGS
+Check the table count stored earlier.
+
+
+
+CREATE TABLE #counts
+(
+    table_name varchar(255),
+    row_count int
+)
+EXEC sp_MSForEachTable @command1='INSERT #counts (table_name, row_count) 
+SELECT ''?'', COUNT(*) FROM ?'
+SELECT table_name, row_count FROM #counts 
+ORDER BY table_name, row_count DESC
+DROP TABLE #counts
+Confirmation
+Get the Data Network team to change the DNS Alias for the Database to point to the target SQL Server Database Server.
+
+Arrange for application Tier to be started and confirm connections are in the migrated database on the target SQL Database Server.
+
+Ensure the passwords for the SQL Logins are stored in the PAM.
+
+Initiate the Full backup of the particular database on both Source and destination server.
+
+Add new entries for the database to the Council Application Page
+
+Run the <DBA_MaintenancePlan.Update SQL Server Central> Job on Source SQL Server Instance.
+
+Disable all the DBA_Maintenance Plans jobs in the SQL Server Instance if all the Databases are candidate for decommissioning.
+
+Update the Offline Date on Database Central - M903PRD1
+
+
+
+/* Find the Server ID */
+select Server_ID,Server_Name,Last_Modified_Date,Decommission_date from [Database_Central].[bcc].[MSSQL_server]
+where server_Name = '<SQL Server Instance Name>'
+/*Find the Database needs to be updated with offline date*/
+select Database_Name,status,Last_Modified_Date,Database_Offline_Date from [Database_Central].[bcc].[MSSQL_Database]
+where server_ID = <Server_ID> and Database_Name not in ('model','msdb','tempdb','master')
+/*Update the Offline Date for specific Database*/
+-- RUN THE BEGIN TRAN WITHOUT COMMIT
+BEGIN TRAN 
+UPDATE [Database_Central].[bcc].[MSSQL_Database]
+SET Database_Offline_Date = getdate() -- or the date the Database being offline
+WHERE SERVER_ID = <Server ID> and Database_Name = '<Database Name>'
+COMMIT --  IF YOU SEE THE SAME EXPECTED AFFECTED ROW COUNT THAN ONLY RUN COMMIT ELSE RUN ROLLBACK
+/*Verify the change */
+select Database_Name,Database_Offline_Date,Last_Database_Backup_Date,Last_Modified_Date from [Database_Central].[bcc].[MSSQL_Database]
+where server_ID = <Server ID> and status = 'OFFLINE' 
+Run the <DBA_MaintenancePlan.Update SQL Server Central> Job on destination SQL Server Instance.
+
+Update the Application name, System Code and Application Contact on Database Central - M903PRD1
+
+
+
+use Database_Central
+go
+select s.Server_Name,d.Database_ID,d.Database_Name,d.Status,
+d.Application_Name,d.Application_Contact,d.decommission_date
+from bcc.MSSQL_Database d, Database_Central.bcc.MSSQL_Server s 
+where d.Database_Name='<DATABASE_NAME>' and s.Environment='<ENVIRONMENT> '
+and s.Server_ID = d.Server_ID
+go
+--Update the Application name, System Code and Application Contact
+Update bcc.MSSQL_Database set Application_Name='<>',Application_Contact='<>',system_code='<>'
+where Database_ID=<Database_ID>
+go
+If "Always on Availability" is implemented on the Migrated database remove the Availability Group.
+
+To remove the "Always on Availability" check and validate the existing "Always On Availability Group" configuration by launching the dashboard report. Connect to the server instance that hosts the primary replica, expand the folder "Always On High Availability" on the primary replica, you can see the name of the availability group, right click on the availability group named and select the <Delete> option.
+
+Configure Always On Availability, on the Database in the target SQL Server providing this is appropriate.
+
+Ensure the Council Application Page for the application is updated to reflect the new location for the repository.
+
+If request come from IMP Team, include a final task against each CRQ for IMP team 'Advise IMP' with the following details into the task notes. This is to allow IMP to track servers and their dependencies.
+
+Host virtual/physical server name
+
+SQL Server Instance Name
+
+Database name
+
+Related application name(s)
+
+If ROLLBACK required then action the rollback plan. Otherwise perform a full backup of the database on the target Database Server.
+
+Rollback
+Arrange for application Tier to be stopped.
+
+Disable application jobs on the target SQL Database Server.
+
+Disable SQL Server Logins on the target SQL Database Server.
+
+Online the database on the source SQL Server Database Server. If the live Data is inserted on Target Server, Database Team may need to take the backup of the Database from Target Server and Restore into Source Server. (This is applicable if the SQL Server is running with same SQL Server Version)
+
+Enable the application database jobs on the source SQL Server.
+
+Enable the SQL Server Logins on the source SQL Server.
+
+Get Data Network team to change the DNS Alias for the Database to point to the source SQL Server Database Server.
+
+Arrange for application Tier to be started. Confirm successful Connections.
