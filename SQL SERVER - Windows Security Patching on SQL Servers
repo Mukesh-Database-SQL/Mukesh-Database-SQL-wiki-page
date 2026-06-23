@@ -1,0 +1,96 @@
+Actions
+SQL Server standalone servers (SQL Server and Analysis Services) 
+
+Check the database status (online, offline, recovery) 
+
+
+
+use master
+go   
+select serverproperty ('servername') as [Instance Name],
+name as [Database Name],state_desc as [Status] ,user_access_desc as [User Access Desc],
+case is_auto_close_on
+when 1 then 'ON'
+when 0 then 'OFF'
+end as [Auto Close]
+from sys.databases
+Check the active connection. Advise Service Assurance to reconfirm the application services stop.
+
+
+
+SELECT 
+    DB_NAME(dbid) as DBName, hostname,
+    COUNT(dbid) as NumberOfConnections,
+    loginame as LoginName
+FROM
+    master..sysprocesses
+WHERE 
+    dbid > 0
+GROUP BY 
+    dbid, loginame,hostname
+go
+Change coordinator advises DBA to check database status
+
+The database team tests connections in the SQL Server instance.
+
+Database team: check the database status (ONLINE, RECOVERY)
+
+Check the SQL Server/Analysis Services error log and the Windows application log
+
+If an error occurs, the database group advises the release coordinator.
+
+
+
+select MessageIdTime, Body from LCSLOG.dbo.Messages order by MessageIdTime desc 
+go
+select Date, Body from LCSLOG.dbo.ConferenceMessages order by Date desc
+go
+SQL Cluster SQL Server(AlwaysOn) 
+
+Check the database status (online, offline, recovery) 
+
+
+
+use master
+go   
+select serverproperty ('servername') as [Instance Name],
+name as [Database Name],state_desc as [Status] ,user_access_desc as [User Access Desc],
+case is_auto_close_on
+when 1 then 'ON'
+when 0 then 'OFF'
+end as [Auto Close]
+from sys.databases
+Check for any active connections. Advise Service Assurance to confirm the Application Services have stopped.
+
+
+
+SELECT 
+    DB_NAME(dbid) as DBName, hostname,
+    COUNT(dbid) as NumberOfConnections,
+    loginame as LoginName
+FROM
+    master..sysprocesses
+WHERE 
+    dbid > 0
+GROUP BY 
+    dbid, loginame,hostname
+go
+Ensure nightly database backups run successfully on the current primary server.
+
+Fail over the databases in the AlwaysOn server as directed by the release coordinator in the runsheet.
+
+Connect to the primary instance, then expand the AlwaysOn high availability node and the Availability Groups node. 
+
+Image2.png
+Right-click the availability group to failover, and select Failover. 
+
+Image3.png
+Select the new primary replica, then click Next to avoid data loss. 
+
+Image5.png
+Click Next and confirm the wizard completed successfully. 
+
+Image9.png
+Once done, check the dashboard for the synchronized database state. 
+
+Image10.png
