@@ -1,0 +1,241 @@
+Prerequisites
+The following are prerequisites for the successful completion of this procedure:
+
+Approved Change within BMC Helix raised with the change template, INF027 - SQL Server Database Decommission-CA14/918925
+
+Update the decommissioned database in CA19/425859 - Database Provisioning-Decommissioning and Migration Activities - Master List status as in Implementation.
+
+Determine if SQL Server Infrastructure is required to be decommissioned. If it is then this procedure should NOT be used.
+
+Determine infrastructure components within the scope of the database decommissioning:
+
+Application related databases.
+
+SQL Server Logins associated with affected databases.
+
+Jobs and Maintenance Plans related to the database.
+
+Server Objects used by logic within the affected database.
+
+Always on Availability Configuration.
+
+DNS Alias with correct Server mapping.
+
+Write access to Records Manager on CA19/425859
+
+If Decommission request comes in form of Task of Change Template APP006 - <<Application Name>> - UAT - Application decommission master change. SQL Team will open a new standard change, INF027 - SQL Server Database Decommission and relate the change to decommission task of Change APP006.Once SQL Team have completed the decommission then close the task and the standard change.
+
+Actions
+Connect the SQL Server Instance with the Database Host Alias Name. (Wherever applicable)
+
+Disable specific database monitoring of the affected databases.
+
+Arrange for application Tier to be stopped. Refer to the application specific notes on who does this.
+
+Disable the SQL Server jobs related to application (if any) . Take the reference of application page for details.
+
+If "Always on Availability" is implemented on the affected database remove the Availability Group.
+
+To remove the "Always on Availability" check and validate the existing "Always On Availability Group" configuration by launching the dashboard report. Connect to the server instance that hosts the primary replica, expand the folder "Always On High Availability" on the primary replica, you can see the name of the availability group, right click on the availability group named and select the <Delete> option.
+
+Once all connections to the database have been closed (i.e.. no active connections into the source database.) then commence the decommissioning work. Otherwise confirm with application support that the application tier is down. You can check whether connections exist into the database via activity monitor or running the below query in a query window.
+If connections are persistent and unexplained then issue the kill command or kill the session from within SQL Server Management Studio (SSMS).
+
+
+
+SELECT 
+    DB_NAME(dbid) as DBName, hostname,
+    COUNT(dbid) as NumberOfConnections,
+    loginame as LoginName
+FROM
+    master..sysprocesses
+WHERE 
+    dbid > 0
+GROUP BY 
+    dbid, loginame,hostname
+go
+ 
+
+If there is current connection for requested decommission database, DBA team will inform to IMP team with connection details. Database will be decommissioned when there is no connection in requested database. This is to avoid the false alerts from logins.
+
+ 
+
+Disable the Application SQL Server Logins in the SQL Server. This is to ensure Middle tiers other than the application tier cannot access database and cause an error in the log. Wait for 10 - 15 minutes and review logs before recommencing decommissioning procedure.
+
+Take the backup of Application jobs/Maintenance Plans, SQL Server Logins and server objects in the SQL Server infrastructure.
+
+Change the Database into single_user_mode.
+
+Validate the size of the database and based on that initiate the SQL Native backup with compression mode on (E:\Backup\CRQ_\<DatabaseName_yymmdd.bak>).
+
+
+
+BACKUP DATABASE [WINCAN_CMS]
+TO  DISK = N'E:\Backup\CRQ_\<DatabaseName_yymmdd.bak'
+WITH NOFORMAT, NOINIT,  NAME = N'<Database_Name>-Full Database Backup',
+SKIP, NOREWIND, NOUNLOAD, COMPRESSION, STATS = 10
+GO
+OFFLINE the database.
+
+Run the <DBA_MaintenancePlan.Update SQL Server Central> Job on designated SQL Server Instance.
+
+Disable all the DBA_Maintenance Plans jobs in the SQL Server Instance if all the Databases are candidate for decommissioning.
+
+Connect to the Database Central - M903PRD1
+
+
+
+/* Find the Server ID */
+select Server_ID,Server_Name,Last_Modified_Date,Decommission_date from [Database_Central].[bcc].[MSSQL_server]
+where server_Name = '<SQL Server Instance Name>'
+/*Update the Offline Date for specific Database*/
+UPDATE [Database_Central].[bcc].[MSSQL_Database]
+SET Database_Offline_Date = getdate()
+WHERE SERVER_ID = <Server ID> and Database_Name = '<Database Name>'
+/*Verify the change */
+select Database_Name,Database_Offline_Date,Last_Database_Backup_Date,Last_Modified_Date from [Database_Central].[bcc].[MSSQL_Database]
+where server_ID = <Server ID> and status = 'OFFLINE' 
+ 
+
+Wait until the Decommission Date specified in the change before progressing to the next steps. If a decommission date is not specified then commence the following steps 7 days after the OFFLINE DATE specified in the change.
+
+ 
+
+Run the <DBA_MaintenancePlan.Update SQL Server Central> Job on designated SQL Server Instance.
+
+Drop Application Database jobs/Maintenance Plans, SQL Server Logins and server objects in the SQL Server infrastructure.
+
+Detach the database.
+
+
+
+USE [master]
+GO
+EXEC master.dbo.sp_detach_db @dbname = N'<Database_Name>'
+GO
+Take the backup of Application login passwords from the password portal.
+
+Perform a long term backup of the Database jobs/Maintenance Plans, SQL Server Logins, server objects, Application login passwords, physical data and log files for the database and update the long term backups record in the BCC SQLSERVER LONG TERM BACKUPS wiki page.
+
+List all the backup save sets Manually from Data Domain using DOSprompt for default instance:
+
+ 
+
+
+
+ddbmexptool.exe -n mssql -a DDBOOST_USER=boost -a DEVICE_PATH=SQL_Backups -a DEVICE_HOST=<DD CLIENT> -a CLIENT=<HOST NAME>.ad.bcc.qld.gov.au -N MSSQL:<database_name> 
+ 
+
+List all the backup save sets Manually from Data Domain using DOSprompt for named instance
+
+
+
+ddbmexptool.exe -n mssql -a DDBOOST_USER=boost -a DEVICE_PATH=SQL_Backups -a DEVICE_HOST=<DD CLIENT> -a CLIENT=<HOST NAME>.ad.bcc.qld.gov.au -N MSSQL$<instance_name>:<Database_name> 
+ 
+
+Remove backup manually from Data Domain using DOSprompt for default instance by using below command:
+
+
+
+ddbmexptool.exe -d -n mssql -a DDBOOST_USER=boost -a DEVICE_PATH=SQL_Backups -a DEVICE_HOST=<DD CLIENT> -a CLIENT=<Host Name>.ad.bcc.qld.gov.au -N "MSSQL:<Database_name>" 
+ 
+
+Remove backup manually from Data Domain using DOSprompt for named instance by using below command:
+
+
+
+ddbmexptool.exe -d -n mssql -a DDBOOST_USER=boost -a DEVICE_PATH=SQL_Backups -a DEVICE_HOST=<DD CLIENT> -a CLIENT=<Host name>.ad.bcc.qld.gov.au -N "MSSQL$<instance_name>:<Database_name>"
+ 
+
+Remove any database backups for the decommissioned database on the database servers on E:\Backup and the standard SQL Server backup directory.
+
+Reattach the database and then delete the database through SQL Server Management Studio.
+
+
+
+USE [master]
+GO
+CREATE DATABASE [Database_Name] ON 
+( FILENAME = N'Phyical_Path\*.mdf' ),
+( FILENAME = N'Phyical_Path\*.ldf' )
+ FOR ATTACH
+GO
+ 
+
+Validate the DNS alias name(s) with affected Server name.
+
+
+
+e.g.
+C:\>nslookup
+Default Server:  infobloxbsq.bcc.qld.gov.au
+Address:  136.236.241.250
+> set type=A
+> CMXP
+Server:  infobloxbsq.bcc.qld.gov.au
+Address:  136.236.241.250
+Name:    m460prd1.bcc.qld.gov.au
+Address:  10.108.30.1
+Aliases:  CMXP.bcc.qld.gov.au
+ 
+
+Validate the DNS alias name(s) is(are) not a host or virtual host DNS name.
+
+Validate the DNS alias name(s) is(are) not is use by other databases or instances in a shared server environment.
+
+If the above validations are true, arrange for Data Network group to remove DNS Alias for the Database.
+
+Remove infrastructure passwords related to the database from the PAM.
+
+Archive the application documentation page to BCC SQLSERVER ARCHIVED APPLICATIONS
+
+Remove entries for the database from the Council Application Page
+
+Update decommission date on MSSQL_Central - M903PRD1
+
+
+
+--Individual Database
+use Database_Central
+go
+select s.Server_Name,d.Database_ID,d.Database_Name,d.Status,d.Decommission_date
+from  Database_Central.bcc.MSSQL_Database d, Database_Central.bcc.MSSQL_Server s 
+where d.Database_Name='<Database Name>' and s.server_name='<SQL Server Instance Name>'
+and s.Server_ID = d.Server_ID
+order by decommission_date
+go
+update bcc.MSSQL_Database set decommission_date=getdate()
+where Database_ID='<Database_ID>'
+go
+--All databases on particular Instance
+use Database_Central
+go
+select s.Server_Name,d.Database_ID,d.Database_Name,d.Status,d.Decommission_date
+from Database_Central.bcc.MSSQL_Database d, Database_Central.bcc.MSSQL_Server s 
+where s.server_name='<SQL Server Instance Name>'
+and s.Server_ID = d.Server_ID
+order by decommission_date
+go
+update bcc.MSSQL_Database set decommission_date=getdate()
+from Database_Central.bcc.MSSQL_Database d, Database_Central.bcc.MSSQL_Server s 
+where s.server_name='<SQL Server Instance Name>'
+and s.Server_ID = d.Server_ID
+ 
+
+Include a final task against each CRQ for IMP team 'Advise IMP' with the following details into the task notes.
+
+This is to allow IMP to track servers and their dependencies.
+
+Host virtual/physical server name
+
+SQL Server Instance Name
+
+Database name
+
+Related application name(s)
+
+Record the Decommissioned database in CA19/425859 - Database Provisioning-Decommissioning and Migration Activities - Master List in decommissions worksheet
+
+In case Server needs to be decommission after the database decommission following procedure needs to be follow.
+
+Instance decommission
