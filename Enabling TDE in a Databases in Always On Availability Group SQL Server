@@ -1,0 +1,179 @@
+Outcome
+Transparent Data Encryption is about securing the data at rest on the SQL Server. If the data files are stolen and are attempted to be restored, the data thieves will not be able to perform a successful restore. If a database is being used in database mirroring, log shipping or AlwaysOn, both databases will be encrypted. The log transactions will be encrypted when sent between them. Database is not encrypted and is part of Availability Group If you have an AlwaysOn setup and the database in the Availability Group is not encrypted. This procedure will allow to enable TDE on that database. When you turn on the process of database encryption on the Primary replica, each of the Secondary replicas will also initiate the process of encryption. You don’t have to explicitly turn on encryption for the Secondary replica. If the database size is large, you may have to wait for few hours before the database completes the encryption process on the Secondary replicas.
+
+Prerequisites
+The following are prerequisites for the successful completion of this procedure:
+
+Approved change within BMC Helix with appropriate notes attached to the change.
+
+Actions
+Enabling TDE on Databases in an Always On Availability Group
+Step 1: On Primary Replica create Database MASTER KEY (DMK)
+The database master key (DMK) is a symmetric key which secure the private keys of the certificates existing on the databases. The master key is encrypted using the AES_256 algorithms along with a password. 
+
+
+
+USE master;
+GO
+CREATE MASTER KEY ENCRYPTION
+BY PASSWORD = '########';
+GO
+Perform an immediate backup of the Master Key once the database master key is created and is recommended to perform the back up on a secured location. 
+
+
+
+-- Backup the Master Key
+BACKUP MASTER KEY
+TO FILE = 'E:\Backup\TDE\<SeverName_InstanceName>_MasterKEY'
+ENCRYPTION BY Password = '############';
+Step 2: On Primary Replica Create CERTIFICATE
+Certificates are used in Transparent Data Encryption to secure the Database Encryption Key. If you refer step 3, you will find that Database Encryption Key uses the certificate for encryption. Remember to keep a note of certificate that is used to secure the Database Encryption Key. 
+
+
+
+-- Create Certificate Protected by Master Key
+CREATE CERTIFICATE <ServerName>_<InstanceName>_TDE_Certificate
+WITH 
+SUBJECT='MSSQL_Database_TDE_Encryption';
+GO
+The backup files of TDE enabled databases are also encrypted by using the database encryption key and in turn, the certificates secure the DEK. Consequently, the backup of the certificate is required when you are restoring the TDE enabled database. You will observe that this command will create two files; a) Certificate b) Private Key 
+
+
+
+-- Backup the Certificate
+BACKUP CERTIFICATE <ServerName>_<InstanceName>_TDE_Certificate
+TO FILE = 'E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate'
+WITH PRIVATE KEY 
+(
+file='E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate_Key.pvk',
+ENCRYPTION BY PASSWORD = '#######'
+)
+GO
+Step 3: On Primary Replica create database Encryption Key (DEK)
+Before you enable the TDE, database encryption key needs to be created. DEK is used to encrypt the actual database content including the log. It is a symmetric key and you can create using available AES algorithms. In this document AES_128 is being used. 
+
+
+
+-- Create a Database Encryption Key
+USE <DBName>
+GO
+CREATE DATABASE ENCRYPTION KEY
+WITH ALGORITHM = AES_256
+ENCRYPTION BY SERVER CERTIFICATE <ServerName>_<InstanceName>_TDE_Certificate;
+GO
+If there are multiple databases you can do so in the same step 3, just change the name of the database. Note that database encryption key needs to be only created on Primary, as the AlwaysOn synchronization process will take care of the secondary replicas.
+
+Step 4: On Secondary Replica create of the DMK
+In Case 1, as the database is also available on the secondary replica, the DMK also needs to be created, unless there is one existing already. Verify if the DMK already exists using the below query. 
+
+
+
+USE MASTER;
+GO
+SELECT *
+ FROM  sys.symmetric_keys
+ WHERE name = '##MS_DatabaseMasterKey##'
+NOTE:If the DMK exists,creation of DMK is not required on Secondary replica.
+If it does not exist, use the below to create a DMK. 
+
+
+
+-- Create a Master Key, use the same password as of primary for simplifying it, however, you do not need to have the same password on each instance.
+USE Master;
+GO
+CREATE MASTER KEY ENCRYPTION
+BY PASSWORD=’########’
+GO
+As the secondary replica, may become the primary replica in the event of a failover, it is a good practice to perform an immediate backup of the Master Key on the secondary replica, too. It is recommended to perform the backup to a secured location. 
+
+
+
+-- Backup the Master Key on secondary in order we have this when it turns into Primary and we need not worry when recovery event occurs.
+-- Backup the Master Key
+BACKUP MASTER KEY
+TO FILE = 'E:\Backup\TDE\<SeverName_InstanceName>_MasterKEY'
+ENCRYPTION BY Password = '############';
+Step 5: On Secondary Replica create Certificate from the Primary Certificate Backup.
+If the certificate does not exist, you will need to create one on the secondary replica. You can verify from the sys.certificates table using following script. 
+
+
+
+SELECT name, 
+       certificate_id, 
+       principal_id, 
+       pvt_key_encryption_type_desc, 
+       start_date, expiry_date
+FROM sys.certificates;
+Copy and paste the certificate from Primary to secondary on "E:\Backup" and run the below script to Create Certificate on Secondary 
+
+
+
+-- Create Certificate Protected by Master Key
+USE MASTER
+GO
+CREATE CERTIFICATE \<ServerName>_<InstanceName>_TDE_Certificate'
+FROM FILE = 'E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate'
+WITH PRIVATE KEY (
+FILE = 'E:\Backup\\<ServerName>_<InstanceName>_TDE_Certificate_Key.pvk',
+DECRYPTION BY PASSWORD = '#########' 
+);
+Next, take a back up the certificate on secondary replica using the below command. 
+
+
+
+-- Backup the Certificate
+BACKUP CERTIFICATE <ServerName>_<InstanceName>_TDE_Certificate
+TO FILE = 'E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate'
+WITH PRIVATE KEY 
+(
+file='E:\Backup\<ServerName>_<InstanceName>_TDE_Certificate_Key.pvk',
+ENCRYPTION BY PASSWORD = '#######'
+)
+GO
+Step 6: On Primary Replica Enable TDE Encryption
+The last step is to enable the TDE in the required database. Use the below command to enable TDE. 
+
+
+
+ALTER DATABASE <DBName>
+SET ENCRYPTION ON;
+GO
+If there are multiple databases you can do so in the same step 6, just change the name of the database. Once you execute the above query, the SQL Server will begin encrypting the database. You will now need to monitor its completion
+
+Confirmation
+On the Primary Replica and Secondary Replicas Review Encryption.
+
+Run the below queries on both Primary and Secondary replicas. 
+
+
+
+USE MASTER;
+GO
+SELECT db.name,db.is_encrypted,dm.encryption_state,dm.percent_complete,
+dm.key_algorithm,dm.key_length
+FROM sys.databases db
+LEFT OUTER JOIN 
+sys.dm_database_encryption_keys dm
+ON db.database_id = dm.database_id;
+GO
+!Output Information Details
+*__Is_encrypted:__ A return value of "1" for the is_encrypted column of the sys.databases catalog view indicates that the database has been encrypted successfully through TDE.
+*__Encryption_State:__ A return value of "2" in this column indicates that the encryption process is in progress. A return value of "3" indicates that the encryption process is complete.
+*__Percent_Complete:__ The percent_complete indicates the percent progress of the encryption process.
+%%error __Note:__
+ If the database is large in size and you are running this query on Secondary replica, you will notice the percent_complete will be displayed “0” and encryption_state to be “2” until the entire AlwaysOn sync is complete. It typically takes few hours on the secondary to change the encryption_state to “3”. You will need to be patient.
+%%__
+Send a confirmation email to the requester to confirm that the desired outcome has been achieved.
+
+
+
+Email Subject: <CHANGE NUMBER> - <OBJECTIVE OF CHANGE>
+Email Note:
+Hi <CUSTOMER NAME>,
+We have completed the above change having performed the <OBJECTIVE OF CHANGE>. 
+Could you please confirm the activity was performed successfully to meet your 
+requirements.
+Please direct your response back to this email to OS-IS-dddataengineering@brisbane.qld.gov.au.
+Regards
+Data Team
+ 
